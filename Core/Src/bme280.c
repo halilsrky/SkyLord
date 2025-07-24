@@ -14,6 +14,7 @@
 
 extern BME_parameters_t bme_params;
 extern int is_BME_ok;
+extern UART_HandleTypeDef huart2;
 
 static I2C_HandleTypeDef* I2C_;
 static BME_280_t*         BME;
