@@ -1,0 +1,8 @@
+../Core/Src/flight_algorithm.c:48:6:flight_algorithm_init	8	static
+../Core/Src/flight_algorithm.c:56:6:flight_algorithm_reset	4	static
+../Core/Src/flight_algorithm.c:73:6:flight_algorithm_update	32	static
+../Core/Src/flight_algorithm.c:154:14:calculate_total_acceleration	16	static
+../Core/Src/flight_algorithm.c:164:15:flight_algorithm_get_phase	4	static
+../Core/Src/flight_algorithm.c:172:10:flight_algorithm_get_status_bits	4	static
+../Core/Src/flight_algorithm.c:180:6:flight_algorithm_set_parameters	24	static
+../Core/Src/flight_algorithm.c:195:10:flight_algorithm_get_start_time	4	static

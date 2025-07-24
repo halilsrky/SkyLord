@@ -1,0 +1,4 @@
+../Core/Src/test_modes.c:22:6:test_modes_init	1
+../Core/Src/test_modes.c:30:6:test_modes_handle_sit	1
+../Core/Src/test_modes.c:40:6:algorithm_update_sut	3
+../Core/Src/test_modes.c:59:10:test_modes_handle_sut	1

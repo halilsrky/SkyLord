@@ -1,0 +1,6 @@
+../Core/Src/packet.c:14:15:check_sum_hesapla_normal	2
+../Core/Src/packet.c:22:15:check_sum_hesapla_sit	2
+../Core/Src/packet.c:31:8:round2	1
+../Core/Src/packet.c:35:6:addDataPacketNormal	1
+../Core/Src/packet.c:141:6:addDataPacketSit	1
+../Core/Src/packet.c:205:7:uint8_arrayi_float32_ye_donustur	1

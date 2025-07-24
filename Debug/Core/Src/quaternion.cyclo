@@ -1,0 +1,8 @@
+../Core/Src/quaternion.c:11:6:ekf_init	4
+../Core/Src/quaternion.c:17:6:ekf_predict	6
+../Core/Src/quaternion.c:50:6:ekf_update	27
+../Core/Src/quaternion.c:147:7:ekf_getTheta	1
+../Core/Src/quaternion.c:159:7:quaternionToYaw1	1
+../Core/Src/quaternion.c:164:7:quaternionToPitch1	1
+../Core/Src/quaternion.c:169:7:quaternionToRoll1	1
+../Core/Src/quaternion.c:174:8:ekf_getQuaternion	1
