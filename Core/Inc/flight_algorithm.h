@@ -30,7 +30,6 @@ typedef enum {
     PHASE_IDLE,             // Pre-launch, on pad
     PHASE_BOOST,            // Rocket engines burning
     PHASE_COAST,            // After burnout, still ascending
-    PHASE_DROGUE_DESCENT,   // Descent with drogue
     PHASE_MAIN_DESCENT,     // Descent with main parachute
     PHASE_LANDED            // Landed
 } FlightPhase_t;

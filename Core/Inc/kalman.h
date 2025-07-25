@@ -34,5 +34,5 @@ typedef struct {
 void KalmanFilter_Init(KalmanFilter_t *kf);
 float KalmanFilter_Update(KalmanFilter_t *kf, float altitude, float accel, float dt);
 int KalmanFilter_IsApogeeDetected(KalmanFilter_t *kf);
-
+float Kalman_Get_Velocity(KalmanFilter_t *kf);
 #endif /* KALMAN_H */

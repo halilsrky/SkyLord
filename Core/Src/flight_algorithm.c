@@ -29,8 +29,12 @@ static float max_angle_threshold = 70.0f;     // degrees
 static uint8_t is_rising = 0;
 static uint8_t is_stabilized = 1;
 static uint8_t is_armed = 0;
+static uint8_t deployed_angle = 1;
+static uint8_t deployed_velocity = 1;
 static uint8_t drogue_deployed = 0;
 static uint8_t main_deployed = 0;
+int apogee_counter = 0;
+float prev_velocity = 0;
 
 static uint32_t flight_start_time = 0;
 static uint8_t altitude_decrease_count = 0;
@@ -65,6 +69,10 @@ void flight_algorithm_reset(void)
     status_bits = 0;
     prev_altitude = 0.0f;
     flight_start_time = 0;
+    deployed_velocity = 1;
+    deployed_angle = 1;
+    apogee_counter = 0;
+    prev_velocity = 0;
 }
 
 /**
@@ -107,30 +115,42 @@ void flight_algorithm_update(BME_280_t* bme, bmi088_struct_t* bmi, sensor_fusion
                 status_bits |= 0x0004; // Set Bit 2: Minimum altitude threshold exceeded
             }
 
-         /*   // Check if angle exceeds threshold
-            if (is_armed && (fabs(bmi->angleY) > max_angle_threshold)) {
+            // Check if angle exceeds threshold
+            if (is_armed && (fabs(bmi->angleY) > max_angle_threshold) && deployed_angle) {
+            	drogue_deployed = 1;
+            	deployed_angle = 0;
                 status_bits |= 0x0008; // Set Bit 3: Rocket body angle exceeds threshold
-            }*/
+            }
 
-            // Detect altitude decrease (apogee)
-            if (is_armed && sensor_fusion->apogeeDetect == 1) {
-				current_phase = PHASE_DROGUE_DESCENT;
+       /*     // Detect altitude decrease (apogee)
+            if (is_armed && sensor_fusion->apogeeDetect == 1 && deployed_velocity) {
 				status_bits |= 0x0010; // Set Bit 4: Rocket altitude started decreasing
-
 				status_bits |= 0x0020; // Set Bit 5: Drag parachute deployment command generated
 				drogue_deployed = 1;
+				deployed_velocity = 0;
 				// deploy_drogue_parachute(); // Actual deployment command
-            }
-            break;
+            }*/
 
-        case PHASE_DROGUE_DESCENT:
+            if (is_armed && sensor_fusion->velocity < 0.0f && sensor_fusion->velocity < prev_velocity && deployed_velocity) {
+				apogee_counter++;
+				if (apogee_counter >= 5) {  // Confirm apogee after 5 consecutive samples
+					status_bits |= 0x0010; // Set Bit 4: Rocket altitude started decreasing
+					status_bits |= 0x0020; // Set Bit 5: Drag parachute deployment command generated
+					drogue_deployed = 1;
+					deployed_velocity = 0;
+				}
+			} else {
+				apogee_counter = 0;
+			}
+			prev_velocity = sensor_fusion->velocity;
+
             // Deploy main parachute at designated altitude
-            if (drogue_deployed && !main_deployed && bme->altitude < main_chute_altitude) {
+            if (drogue_deployed && bme->altitude < main_chute_altitude) {
                 current_phase = PHASE_MAIN_DESCENT;
                 status_bits |= 0x0040; // Set Bit 6: Rocket altitude below specified altitude
-
                 status_bits |= 0x0080; // Set Bit 7: Main parachute deployment command generated
                 main_deployed = 1;
+                drogue_deployed = 0;
                 // deploy_main_parachute(); // Actual deployment command
             }
             break;

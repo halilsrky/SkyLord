@@ -194,12 +194,13 @@ void sensor_fusion_update_kalman(BME_280_t* BME, bmi088_struct_t* BMI, sensor_fu
     if (initialized) {
         sensor->filtered_altitude = KalmanFilter_Update(&kalman, altitude, accel_z_corrected, time_sec);
         sensor->apogeeDetect = KalmanFilter_IsApogeeDetected(&kalman);
+        sensor->velocity = Kalman_Get_Velocity(&kalman);
         // Store velocity estimate for later use
-        static float prev_altitude = 0.0f;
+     /*   static float prev_altitude = 0.0f;
         if (time_sec > 0.001f) {
             sensor->velocity = (sensor->filtered_altitude - prev_altitude) / time_sec;
         }
-        prev_altitude = sensor->filtered_altitude;
+        prev_altitude = sensor->filtered_altitude;*/
 
         // Arıza durumunu sensor yapısına ekleyelim (telemetri için kullanılabilir)
         sensor->accel_failure = accel_failure_detected;

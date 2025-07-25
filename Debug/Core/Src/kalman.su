@@ -3,4 +3,5 @@
 ../Core/Src/kalman.c:82:13:KalmanFilter_TimeUpdate	224	static
 ../Core/Src/kalman.c:151:13:KalmanFilter_MeasurementUpdate	488	static
 ../Core/Src/kalman.c:325:12:KalmanFilter_DetectApogee	16	static
-../Core/Src/kalman.c:345:5:KalmanFilter_IsApogeeDetected	16	static
+../Core/Src/kalman.c:343:7:Kalman_Get_Velocity	16	static
+../Core/Src/kalman.c:351:5:KalmanFilter_IsApogeeDetected	16	static

@@ -1,8 +1,8 @@
-../Core/Src/flight_algorithm.c:48:6:flight_algorithm_init	1
-../Core/Src/flight_algorithm.c:56:6:flight_algorithm_reset	1
-../Core/Src/flight_algorithm.c:73:6:flight_algorithm_update	14
-../Core/Src/flight_algorithm.c:154:14:calculate_total_acceleration	1
-../Core/Src/flight_algorithm.c:164:15:flight_algorithm_get_phase	1
-../Core/Src/flight_algorithm.c:172:10:flight_algorithm_get_status_bits	1
-../Core/Src/flight_algorithm.c:180:6:flight_algorithm_set_parameters	1
-../Core/Src/flight_algorithm.c:195:10:flight_algorithm_get_start_time	1
+../Core/Src/flight_algorithm.c:52:6:flight_algorithm_init	1
+../Core/Src/flight_algorithm.c:60:6:flight_algorithm_reset	1
+../Core/Src/flight_algorithm.c:81:6:flight_algorithm_update	18
+../Core/Src/flight_algorithm.c:174:14:calculate_total_acceleration	1
+../Core/Src/flight_algorithm.c:184:15:flight_algorithm_get_phase	1
+../Core/Src/flight_algorithm.c:192:10:flight_algorithm_get_status_bits	1
+../Core/Src/flight_algorithm.c:200:6:flight_algorithm_set_parameters	1
+../Core/Src/flight_algorithm.c:215:10:flight_algorithm_get_start_time	1

@@ -324,6 +324,10 @@ static void KalmanFilter_MeasurementUpdate(KalmanFilter_t *kf, float altitude, f
  */
 static int KalmanFilter_DetectApogee(KalmanFilter_t *kf) {
     // Velocity is negative and magnitude is increasing
+	if(kf->x[2] > 30.0){
+
+
+	}
     if (kf->x[1] < 0.0f && kf->x[1] < kf->prev_velocity) {
         kf->apogee_counter++;
         if (kf->apogee_counter >= 5) {  // Confirm apogee after 5 consecutive samples
@@ -336,7 +340,9 @@ static int KalmanFilter_DetectApogee(KalmanFilter_t *kf) {
     kf->prev_velocity = kf->x[1];
     return kf->apogee_detected;
 }
-
+float Kalman_Get_Velocity(KalmanFilter_t *kf){
+	return kf->x[1];
+}
 /**
  * @brief Check if apogee has been detected
  * @param kf Pointer to Kalman filter structure
