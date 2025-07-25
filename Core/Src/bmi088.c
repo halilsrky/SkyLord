@@ -116,7 +116,7 @@ static void bmi088_poke()
 */
 void bmi088_config()
 {
-	HAL_NVIC_DisableIRQ(EXTI15_10_IRQn);
+	HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 	HAL_StatusTypeDef retVal = HAL_OK;
 	uint8_t buf[1];
 
@@ -162,11 +162,11 @@ void bmi088_config()
 	retVal != HAL_OK ? errorLine =__LINE__ : 0;
 
 	buf[0] = (GYRO_INT_IO_PP << 1) | (GYRO_INT_ACT_HIGH << 0);
-	retVal |= HAL_I2C_Mem_Write(bmi_I2C, GYRO_I2C_ADD, GYRO_INT_3_4_IO_CONF, I2C_MEMADD_SIZE_8BIT, buf, 1, 20); //Gyro interrupt 3 config
+	retVal |= HAL_I2C_Mem_Write(bmi_I2C, GYRO_I2C_ADD, GYRO_INT_3_4_IO_CONF, I2C_MEMADD_SIZE_8BIT, buf, 1, 20); //Gyro interrupt 4 config
 	retVal != HAL_OK ? errorLine =__LINE__ : 0;
 
 	buf[0] = GYRO_INT_MAP_3;
-	retVal |= HAL_I2C_Mem_Write(bmi_I2C, GYRO_I2C_ADD, GYRO_INT_3_4_IO_MAP, I2C_MEMADD_SIZE_8BIT, buf, 1, 20); //Gyro interrupt pin 3 mapped.
+	retVal |= HAL_I2C_Mem_Write(bmi_I2C, GYRO_I2C_ADD, GYRO_INT_3_4_IO_MAP, I2C_MEMADD_SIZE_8BIT, buf, 1, 20); //Gyro interrupt pin 4 mapped.
 	retVal != HAL_OK ? errorLine =__LINE__ : 0;
 
 	//Accelerometer configuration.
@@ -271,9 +271,9 @@ void bmi088_update()
 			isTimeUpdated = 1;
 		}
 
-		if(BMI->rawDatas.isGyroUpdated)
+		if(BMI->rawDatas.isGyroUpdated && isTimeUpdated)
 		{
-
+			if(isStarded){
 				ret_val = HAL_I2C_Mem_Read(bmi_I2C, GYRO_I2C_ADD, GYRO_RATE_X_LSB, I2C_MEMADD_SIZE_8BIT, BMI->rawDatas.gyro, 6, 10);
 				if(ret_val)
 					return;
@@ -286,15 +286,15 @@ void bmi088_update()
 				BMI->gyro_y = ((float)gyro_y_16 * BMI088_GYRO_LSB_TO_RADS) - BMI->offset_vals[1];
 				BMI->gyro_z = ((float)gyro_z_16 * BMI088_GYRO_LSB_TO_RADS) - BMI->offset_vals[2];
 
-				Orientation_Update(BMI->gyro_x, BMI->gyro_y, BMI->gyro_z,BMI->acc_x,BMI->acc_y,BMI->acc_z, BMI->deltaTime);
+				Orientation_Update(BMI->gyro_y, -BMI->gyro_x, BMI->gyro_z,BMI->acc_y,-BMI->acc_x,BMI->acc_z, BMI->deltaTime);
 				BMI->yaw = quaternionToYaw();
 				BMI->pitch = quaternionToPitch();
 				BMI->roll = quaternionToRoll();
-				BMI->angleZ = quaternionToYawDegree();
+				BMI->angleZ = quaternionToThetaZ();
 				BMI->angleY = quaternionToPitchDegree();
 				BMI->angleX = quaternionToRollDegree();
 
-				ekf_predict(BMI->gyro_x,BMI->gyro_y,BMI->gyro_z,BMI->deltaTime);
+				ekf_predict(BMI->gyro_y,-BMI->gyro_x,BMI->gyro_z,BMI->deltaTime);
 				BMI->yaw1 = quaternionToYaw1();
 				BMI->pitch1 = quaternionToPitch1();
 				BMI->roll1 = quaternionToRoll1();
@@ -303,7 +303,7 @@ void bmi088_update()
 				/*ekf_update(BMI->acc_x, BMI->acc_y, BMI->acc_z);
 				BMI->angle = ekf_getTheta();*/
 				is_gyro_offset = 1;
-
+			}
 			BMI->rawDatas.isGyroUpdated = 0;
 			isTimeUpdated = 0;
 		}

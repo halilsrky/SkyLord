@@ -82,7 +82,7 @@ void flight_algorithm_update(BME_280_t* bme, bmi088_struct_t* bmi, sensor_fusion
 {
     // Calculate key metrics
     float total_acceleration = calculate_total_acceleration(bmi);
-    float theta = sensor_fusion->angle; // Use sensor fusion output
+    //float theta = sensor_fusion->angle; // Use sensor fusion output
 
     // Status bits are cumulative - once set they remain set
     // Each phase builds on the previous phase's status bits

@@ -1,6 +1,6 @@
 ../Core/Src/bmi088.c:117:6:bmi088_config	14
 ../Core/Src/bmi088.c:203:6:bmi088_init	2
-../Core/Src/bmi088.c:227:6:bmi088_update	8
+../Core/Src/bmi088.c:227:6:bmi088_update	10
 ../Core/Src/bmi088.c:315:6:bmi088_getAccelDatas_INT	1
 ../Core/Src/bmi088.c:320:6:bmi088_getGyroDatas_INT	1
 ../Core/Src/bmi088.c:325:9:bmi088_getGyroChipId	1

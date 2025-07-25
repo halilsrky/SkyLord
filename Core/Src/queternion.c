@@ -331,9 +331,9 @@ void getInitialQuaternion() {
     double norm = sqrt(BMI_sensor.acc_z * BMI_sensor.acc_z + BMI_sensor.acc_x * BMI_sensor.acc_x + BMI_sensor.acc_y * BMI_sensor.acc_y);
     double accel_temp[3];
 
-    accel_temp[0] = (double)BMI_sensor.acc_x;
+    accel_temp[0] = (double)BMI_sensor.acc_y;
     accel_temp[1] = (double)-BMI_sensor.acc_z;
-    accel_temp[2] = (double)BMI_sensor.acc_y;
+    accel_temp[2] = (double)BMI_sensor.acc_x;
 
     accel_temp[0] /= norm;
     accel_temp[1] /= norm;

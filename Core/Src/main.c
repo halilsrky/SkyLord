@@ -187,10 +187,7 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 
-
-
-
-	bmi088_update();
+	  	  bmi088_update();
 		  sensor_fusion_update_mahony(&BMI_sensor, &sensor_output);
 		  bme280_update();
 
@@ -208,7 +205,7 @@ int main(void)
 
 		  if (tx_timer_flag) {
 			tx_timer_flag = 0;
-			//IMU_visual();
+			IMU_visual();
 			SystemMode_t current_mode = uart_handler_get_mode();
 
 				switch (current_mode) {
@@ -225,7 +222,6 @@ int main(void)
 						algorithm_update_sut();
 						break;
 				}
-
 		  }
 	}
   /* USER CODE END 3 */
@@ -366,7 +362,7 @@ static void MX_TIM2_Init(void)
   htim2.Instance = TIM2;
   htim2.Init.Prescaler = 8999;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim2.Init.Period = 1999;
+  htim2.Init.Period = 999;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
@@ -606,11 +602,11 @@ void uart1_send_packet_dma(uint8_t *data, uint16_t size)
 
 void IMU_visual(){
 
-	float yaw = BME280_sensor.altitude;
-	float pitch = BMI_sensor.angleY;
+	float yaw = BMI_sensor.yaw;
+	float pitch = BMI_sensor.pitch;
 	float roll = BMI_sensor.roll;
-	float yaw1 = BMI_sensor.gyro_x;
-	float pitch1 = BMI_sensor.acc_z;
+	float yaw1 = BMI_sensor.yaw1;
+	float pitch1 = BMI_sensor.pitch1;
 	float roll1 = BMI_sensor.roll1;
 
 	sprintf(uart_buffer, "A1 %.2f %.2f %.2f\r", yaw, pitch, roll);
