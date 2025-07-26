@@ -46,7 +46,7 @@
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-
+#define IMU_I2C_HNDLR	hi2c3 //put your I2C handler
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -64,7 +64,6 @@ DMA_HandleTypeDef hdma_usart1_tx;
 static BME_280_t BME280_sensor;
 bmi088_struct_t BMI_sensor;
 sensor_fusion_t sensor_output;
-bmi088_struct_t_2 bmi_struct_2;
 uint8_t usart1_rx_buffer[36];
 static char uart_buffer[128];
 BME_parameters_t bme_params; // Added global variable for calibration parameters
@@ -93,7 +92,7 @@ static void MX_UART5_Init(void);
 static void MX_USART1_UART_Init(void);
 /* USER CODE BEGIN PFP */
 static void bme280_begin();
-static void bmi088_begin();
+uint8_t bmi_imu_init(void);
 void IMU_visual();
 /* USER CODE END PFP */
 
@@ -139,7 +138,6 @@ int main(void)
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
 
-
 	MX_TIM2_Init();
 	HAL_TIM_Base_Start_IT(&htim2);
 	HAL_NVIC_SetPriority(TIM2_IRQn, 1, 0);
@@ -149,20 +147,15 @@ int main(void)
 
 
 	bme280_begin();
-	bmi088_begin();
 	HAL_Delay(1000);
 	bme280_config();
-	bmi088_config();
-	if(is_BMI_ok){
-		  getOffset();
-	}
 
+	bmi_imu_init();
+    bmi088_config(&BMI_sensor);
+    get_offset(&BMI_sensor);
 	bme280_update();
 
 	HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
-	BMI_sensor.rawDatas.isGyroUpdated = 0;
-	BMI_sensor.rawDatas.isAccelUpdated = 0;
-
 	getInitialQuaternion();
 
 	//Lora Ayarı
@@ -187,7 +180,7 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 
-	  	  bmi088_update();
+	  	  bmi088_update(&BMI_sensor);
 		  sensor_fusion_update_mahony(&BMI_sensor, &sensor_output);
 		  bme280_update();
 
@@ -205,7 +198,7 @@ int main(void)
 
 		  if (tx_timer_flag) {
 			tx_timer_flag = 0;
-			IMU_visual();
+			//IMU_visual();
 			SystemMode_t current_mode = uart_handler_get_mode();
 
 				switch (current_mode) {
@@ -490,7 +483,23 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOD_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2|GPIO_PIN_10, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_SET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_11, GPIO_PIN_RESET);
+
+  /*Configure GPIO pins : PB2 PB10 PB14 */
+  GPIO_InitStruct.Pin = GPIO_PIN_2|GPIO_PIN_10|GPIO_PIN_14;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   /*Configure GPIO pin : PB13 */
   GPIO_InitStruct.Pin = GPIO_PIN_13;
@@ -498,12 +507,19 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : PB14 */
-  GPIO_InitStruct.Pin = GPIO_PIN_14;
+  /*Configure GPIO pin : PC6 */
+  GPIO_InitStruct.Pin = GPIO_PIN_6;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PA11 */
+  GPIO_InitStruct.Pin = GPIO_PIN_11;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /*Configure GPIO pin : PA12 */
   GPIO_InitStruct.Pin = GPIO_PIN_12;
@@ -534,34 +550,40 @@ void bme280_begin()
 
 }
 
-void bmi088_begin()
+//BMI sensor struct filled with configuration settings. Then called bmi088_init function.
+uint8_t bmi_imu_init(void)
 {
-	//Acccel config
-	BMI_sensor.deviceConfig.acc_bandwith = ACC_BWP_OSR4;
-	BMI_sensor.deviceConfig.acc_outputDateRate = ACC_ODR_200;
-	BMI_sensor.deviceConfig.acc_powerMode = ACC_PWR_SAVE_ACTIVE;
-	BMI_sensor.deviceConfig.acc_range = ACC_RANGE_12G;
+	//Acc config
+	BMI_sensor.device_config.acc_bandwith = ACC_BWP_OSR4;
+	BMI_sensor.device_config.acc_outputDateRate = ACC_ODR_200;
+	BMI_sensor.device_config.acc_powerMode = ACC_PWR_SAVE_ACTIVE;
+	BMI_sensor.device_config.acc_range = ACC_RANGE_24G;
 
-	//Gyro config
-	BMI_sensor.deviceConfig.gyro_bandWidth = GYRO_BW_116;
-	BMI_sensor.deviceConfig.gyro_range = GYRO_RANGE_2000;
-	BMI_sensor.deviceConfig.gyro_powerMode = GYRO_LPM_NORMAL;
-	bmi088_init(&BMI_sensor, &hi2c3);
+	// Gyro config
+	BMI_sensor.device_config.gyro_bandWidth = GYRO_BW_116;
+	BMI_sensor.device_config.gyro_range = GYRO_RANGE_2000;
+	BMI_sensor.device_config.gyro_powerMode = GYRO_LPM_NORMAL;
+
+	BMI_sensor.device_config.acc_IRQ = EXTI15_10_IRQn;
+	BMI_sensor.device_config.gyro_IRQ = EXTI15_10_IRQn;
+	BMI_sensor.device_config.BMI_I2c = &IMU_I2C_HNDLR;
+	BMI_sensor.device_config.offsets = NULL;	//Offset datas stored in backup sram for saving them unwanted reset.
+
+	return	bmi088_init(&BMI_sensor);
 }
 
 
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
-
-    if(GPIO_Pin == GPIO_PIN_13)
-    {
-    	bmi088_getGyroDatas_INT();
-    }
     if(GPIO_Pin == GPIO_PIN_12)
-    {
-    	bmi088_getAccelDatas_INT();
-    }
+	{
+		bmi088_set_accel_INT(&BMI_sensor);
+	}
+	if(GPIO_Pin == GPIO_PIN_13)
+	{
+		bmi088_set_gyro_INT(&BMI_sensor);
+	}
 }
 
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
@@ -602,12 +624,12 @@ void uart1_send_packet_dma(uint8_t *data, uint16_t size)
 
 void IMU_visual(){
 
-	float yaw = BMI_sensor.yaw;
-	float pitch = BMI_sensor.pitch;
-	float roll = BMI_sensor.roll;
-	float yaw1 = BMI_sensor.yaw1;
-	float pitch1 = BMI_sensor.pitch1;
-	float roll1 = BMI_sensor.roll1;
+	float yaw = BMI_sensor.datas.yaw;
+	float pitch = BMI_sensor.datas.pitch;
+	float roll = BMI_sensor.datas.roll;
+	float yaw1 = BMI_sensor.datas.yaw1;
+	float pitch1 = BMI_sensor.datas.pitch1;
+	float roll1 = BMI_sensor.datas.roll1;
 
 	sprintf(uart_buffer, "A1 %.2f %.2f %.2f\r", yaw, pitch, roll);
 	HAL_UART_Transmit(&huart1, (uint8_t*)uart_buffer, strlen(uart_buffer), 100);

@@ -67,12 +67,12 @@ uint16_t test_modes_handle_sut(sut_data_t* sut_data, sensor_fusion_t* sensor_out
     bme_sut.pressure = sut_data->pressure;
 
     // Fill BMI data
-    bmi_sut.acc_x = sut_data->acc_x;
-    bmi_sut.acc_y = sut_data->acc_y;
-    bmi_sut.acc_z = sut_data->acc_z;
-    bmi_sut.gyro_x = sut_data->gyro_x;
-    bmi_sut.angleY = sut_data->gyro_y;
-    bmi_sut.gyro_z = sut_data->gyro_z;
+    bmi_sut.datas.acc_x = sut_data->acc_x;
+    bmi_sut.datas.acc_y = sut_data->acc_y;
+    bmi_sut.datas.acc_z = sut_data->acc_z;
+    bmi_sut.datas.gyro_x = sut_data->gyro_x;
+    bmi_sut.datas.angle_y = sut_data->gyro_y;
+    bmi_sut.datas.gyro_z = sut_data->gyro_z;
 
     // Process synthetic data through sensor fusion first
     //sensor_fusion_update_mahony(&bmi_sut, sensor_output);

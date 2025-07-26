@@ -5,4 +5,5 @@
 ../Core/Src/quaternion.c:159:7:quaternionToYaw1	1
 ../Core/Src/quaternion.c:164:7:quaternionToPitch1	1
 ../Core/Src/quaternion.c:169:7:quaternionToRoll1	1
-../Core/Src/quaternion.c:174:8:ekf_getQuaternion	1
+../Core/Src/quaternion.c:174:7:quaternionToYawDegree1	1
+../Core/Src/quaternion.c:181:8:ekf_getQuaternion	1

@@ -16,8 +16,6 @@ void UpdateMahonyGains(float ax, float ay, float az);
 void quaternionToEuler(void);
 void quaternionSet_zero(void);
 float quaternionToThetaZ(void);
-float quaternionToThetaY(void);
-float quaternionToThetaX(void);
 void getInitialQuaternion();
 float quaternionToYaw();
 float quaternionToPitch();

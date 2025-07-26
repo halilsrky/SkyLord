@@ -17,5 +17,6 @@ float ekf_getTheta(void);
 float quaternionToYaw1();
 float quaternionToPitch1();
 float quaternionToRoll1();
+float quaternionToYawDegree1();
 
 #endif /* INC_QUATERNION_H_ */

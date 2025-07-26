@@ -127,11 +127,6 @@ void Orientation_Update(float gx, float gy, float gz, float ax, float ay, float 
 
 void updateQuaternion(float gx, float gy, float gz, float dt) {
 
-	/*float limit = 3.14f; // ~180°/s (rad/s)
-	gx = fminf(fmaxf(gx, -limit), limit);
-	gy = fminf(fmaxf(gy, -limit), limit);
-	gz = fminf(fmaxf(gz, -limit), limit);*/
-
     // Quaternion türevleri
     float qDot1 = 0.5f * (-q[1] * gx - q[2] * gy - q[3] * gz);
     float qDot2 = 0.5f * ( q[0] * gx + q[2] * gz - q[3] * gy);
@@ -155,9 +150,9 @@ void updateQuaternion(float gx, float gy, float gz, float dt) {
 }
 
 void quaternionSet_zero(void) {
-    float ax = (BMI_sensor.acc_y/100);
-    float ay = (BMI_sensor.acc_z/100);
-    float az = (-BMI_sensor.acc_x/100);
+    float ax = (BMI_sensor.datas.acc_y/100);
+    float ay = (BMI_sensor.datas.acc_z/100);
+    float az = (-BMI_sensor.datas.acc_x/100);
 
     float norm = sqrtf(ax * ax + ay * ay + az * az);
     if (norm < 1e-6f) return;
@@ -263,30 +258,6 @@ float quaternionToThetaZ() {
     return acosf(safeValue) * (180.0f / 3.14f);
 }
 
-float quaternionToThetaX() {
-    float r11 = 1 - 2 * q[2] * q[2] - 2 * q[3] * q[3];
-    float r21 = 2 * q[1] * q[2] + 2 * q[0] * q[3];
-    float r31 = 2 * q[1] * q[3] - 2 * q[0] * q[2];
-
-    float dotProduct = r31;
-    float magnitude = sqrtf(r11 * r11 + r21 * r21 + r31 * r31);
-
-    float safeValue = fmaxf(-1.0f, fminf(1.0f, dotProduct / magnitude));
-    return acosf(safeValue) * (180.0f / 3.14f);
-}
-
-float quaternionToThetaY() {
-    float r12 = 2 * q[1] * q[2] - 2 * q[0] * q[3];
-    float r22 = 1 - 2 * q[1] * q[1] - 2 * q[3] * q[3];
-    float r32 = 2 * q[2] * q[3] + 2 * q[0] * q[1];
-
-    float dotProduct = r32;
-    float magnitude = sqrtf(r12 * r12 + r22 * r22 + r32 * r32);
-
-    float safeValue = fmaxf(-1.0f, fminf(1.0f, dotProduct / magnitude));
-    return acosf(safeValue) * (180.0f / 3.14f);
-}
-
 float quaternionToYawDegree() {
     float w = q[0], x = q[1], y = q[2], z = q[3];
     float siny_cosp = 2.0f * (w * z + x * y);
@@ -328,12 +299,12 @@ return roll;
 
 void getInitialQuaternion() {
 
-    double norm = sqrt(BMI_sensor.acc_z * BMI_sensor.acc_z + BMI_sensor.acc_x * BMI_sensor.acc_x + BMI_sensor.acc_y * BMI_sensor.acc_y);
+    double norm = sqrt(BMI_sensor.datas.acc_z * BMI_sensor.datas.acc_z + BMI_sensor.datas.acc_x * BMI_sensor.datas.acc_x + BMI_sensor.datas.acc_y * BMI_sensor.datas.acc_y);
     double accel_temp[3];
 
-    accel_temp[0] = (double)BMI_sensor.acc_y;
-    accel_temp[1] = (double)-BMI_sensor.acc_z;
-    accel_temp[2] = (double)BMI_sensor.acc_x;
+    accel_temp[0] = (double)BMI_sensor.datas.acc_y;
+    accel_temp[1] = (double)-BMI_sensor.datas.acc_z;
+    accel_temp[2] = (double)BMI_sensor.datas.acc_x;
 
     accel_temp[0] /= norm;
     accel_temp[1] /= norm;

@@ -110,13 +110,18 @@ void flight_algorithm_update(BME_280_t* bme, bmi088_struct_t* bmi, sensor_fusion
 
         case PHASE_COAST:
             // Check minimum arming altitude
-            if (!is_armed && bme->altitude > min_arming_altitude) {
+            if (bme->altitude > min_arming_altitude) {
                 is_armed = 1;
                 status_bits |= 0x0004; // Set Bit 2: Minimum altitude threshold exceeded
             }
 
+            if (sensor_fusion->filtered_altitude > min_arming_altitude) {
+                                        is_armed = 1;
+                                        status_bits |= 0x0008; // Set Bit 2: Minimum altitude threshold exceeded
+			}
+
             // Check if angle exceeds threshold
-            if (is_armed && (fabs(bmi->angleY) > max_angle_threshold) && deployed_angle) {
+            if (is_armed && (fabs(bmi->datas.angle_y) > max_angle_threshold) && deployed_angle) {
             	drogue_deployed = 1;
             	deployed_angle = 0;
                 status_bits |= 0x0008; // Set Bit 3: Rocket body angle exceeds threshold
@@ -173,9 +178,9 @@ void flight_algorithm_update(BME_280_t* bme, bmi088_struct_t* bmi, sensor_fusion
  */
 static float calculate_total_acceleration(bmi088_struct_t* bmi)
 {
-    return sqrtf((bmi->acc_x * bmi->acc_x) +
-                 (bmi->acc_y * bmi->acc_y) +
-                 (bmi->acc_z * bmi->acc_z));
+    return sqrtf((bmi->datas.acc_x * bmi->datas.acc_x) +
+                 (bmi->datas.acc_y * bmi->datas.acc_y) +
+                 (bmi->datas.acc_z * bmi->datas.acc_z));
 }
 
 /**

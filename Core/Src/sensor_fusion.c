@@ -170,13 +170,13 @@ void sensor_fusion_update_kalman(BME_280_t* BME, bmi088_struct_t* BMI, sensor_fu
     }
 
     // Calculate vertical acceleration by compensating for gravity using IMU orientation
-    float angle_rad = BMI->angleZ * (M_PI / 180.0f);  // dereceyse radyana çevir
+    float angle_rad = BMI->datas.theta * (M_PI / 180.0f);  // dereceyse radyana çevir
 
     // Yerçekimi ivmesinin lokal z eksenindeki bileşeni
     float g_local_z = 9.81f * cos(angle_rad);
 
     // Gerçek ivmeyi hesapla:
-    float accel_z_corrected = BMI->acc_z - g_local_z;
+    float accel_z_corrected = BMI->datas.acc_z - g_local_z;
 
     // İvme sensörü arıza tespiti
     accel_failure_detected = detect_accel_failure(accel_z_corrected);

@@ -13,21 +13,22 @@
 #include <string.h>
 #include "configuration.h"
 
+
 extern float roll, pitch, yaw;
 
 //Offset Values
 #ifdef ROCKET_CARD
-#define ACCEL_Z_OFFSET 			(double)4.0
-#define ACCEL_Y_OFFSET 			(double)-15.0
-#define ACCEL_X_OFFSET 			(double)-4.0
+#define ACCEL_Z_OFFSET 			(float)4.0
+#define ACCEL_Y_OFFSET 			(float)-15.0
+#define ACCEL_X_OFFSET 			(float)-4.0
 #else
-#define ACCEL_Z_OFFSET 			(double)0.0
-#define ACCEL_Y_OFFSET 			(double)0.0
-#define ACCEL_X_OFFSET 			(double)0.0
+#define ACCEL_Z_OFFSET 			(float)0.0
+#define ACCEL_Y_OFFSET 			(float)0.0
+#define ACCEL_X_OFFSET 			(float)0.0
 #endif
 
 //Accelerometer register address
-#define ACC_I2C_ADD				((uint8_t)0x18 << 1)
+#define ACC_I2C_ADD				((uint8_t)0x18 << 1)	//0x18
 
 #define ACC_SOFTRESET			0x7E
 #define ACC_PWR_CTRL			0x7D
@@ -108,7 +109,7 @@ extern float roll, pitch, yaw;
 #define FIFO_RESET				0xB0
 
 //Gyroscope register address
-#define GYRO_I2C_ADD			((uint8_t)0x68 << 1)
+#define GYRO_I2C_ADD			((uint8_t)0x68 << 1)	//0x68
 
 #define GYRO_SELF_TEST			0x3C
 #define GYRO_INT_3_4_IO_MAP		0x18
@@ -165,33 +166,20 @@ extern float roll, pitch, yaw;
 #define GYRO_INT_MAP_4			0x80
 #define GYRO_INT_MAP_BOTH		0x81
 
-#define BMI088_GYRO_LSB_TO_RADS  (0.061f * 3.141592f / 180.0f) // ≈ 0.001064
+#define DEG_TO_RAD (3.14159265359f / 180.0f)
 
 
-
-
-//Functions
-
-
-
-//Functions
-
-typedef struct bmi088_raw
+//Struct typedefs
+typedef struct bmi088_flag
 {
-	uint8_t accel[9];
-	uint8_t	temp[2];
-	uint8_t	gyro[6];
 	uint8_t isGyroUpdated, isAccelUpdated;
-}bmi088_raw_t;
+}bmi088_flag_t;
 
-typedef struct bmi088_testVals
+typedef struct bmi088_offsets
 {
-	double gyro_x[2], gyro_y[2], gyro_z[2];
-	float acc_x[2], acc_y[2], acc_z[2];
-	int16_t selfTest_gyro_x, selfTest_gyro_y, selfTest_gyro_z;
-	int16_t selfTest_acc_x, selfTest_acc_y, selfTest_acc_z;
-
-}bmi088_testVals_t;
+	float gyro_offset[3];
+	float acc_offset[3];
+}bmi088_offsets_t;
 
 typedef struct bmi088_conf
 {
@@ -202,43 +190,38 @@ typedef struct bmi088_conf
 	uint8_t gyro_powerMode;
 	uint8_t gyro_bandWidth;
 	uint8_t gyro_range;
+	I2C_HandleTypeDef	*BMI_I2c;
+	IRQn_Type acc_IRQ, gyro_IRQ;
+	bmi088_offsets_t	*offsets;
 }bmi088_conf_t;
 
-typedef struct bmi088_struct_2{
-	float q[4];
-}bmi088_struct_t_2;
+typedef struct bmi088_datas
+{
+	float gyro_x, gyro_y, gyro_z;
+	float angle_x, angle_y, angle_z;
+	float theta;
+	float delta_angle_x, delta_angle_y, delta_angle_z;
+	float yaw, pitch, roll;
+	float yaw1, pitch1, roll1;
+	float acc_x, acc_y, acc_z;
+	float temp;
+	float current_time, last_time, delta_time;
+	float vel_x, vel_y, vel_z;
+}bmi088_datas_t;
 
 typedef struct bmi088_struct
 {
-	bmi088_struct_t_2 *bmi088_t_2;
-	bmi088_raw_t 	rawDatas;
-	bmi088_conf_t deviceConfig;
-	bmi088_testVals_t  testVals;
-	int16_t offsetData;
-	double gyro_x, gyro_y, gyro_z;
-	float yaw, pitch, roll;
-	float yaw1, pitch1, roll1;
-	float delta_angle_x, delta_angle_y, delta_angle_z;
-	float acc_x, acc_y, acc_z;
-	float temp;
-	float currentTime, lastTime;
-	float deltaTime;
-	float vel_x, vel_y, vel_z;
-	float angleZ,angleY,angleX;
-	double offset_vals[3];
-	uint8_t isUpdated;
+	bmi088_flag_t 		flags;
+	bmi088_conf_t 		device_config;
+	bmi088_datas_t		datas;
 }bmi088_struct_t;
 
-
-
-
-void bmi088_init(bmi088_struct_t* BMI_, I2C_HandleTypeDef* I2C_);
-void bmi088_config();
-void bmi088_update();
-void bmi088_getGyroDatas_INT();
-void bmi088_getAccelDatas_INT();
-void getOffset();
-uint8_t bmi088_getGyroChipId();
-
+uint8_t bmi088_init(bmi088_struct_t* BMI);
+void bmi088_config(bmi088_struct_t* BMI);
+void bmi088_update(bmi088_struct_t* BMI);
+void bmi088_set_gyro_INT(bmi088_struct_t* BMI);
+void bmi088_set_accel_INT(bmi088_struct_t* BMI);
+void get_offset(bmi088_struct_t* BMI);
+uint8_t bmi088_getGyroChipId(bmi088_struct_t* BMI);
 
 #endif /* INC_BMI088_H_ */

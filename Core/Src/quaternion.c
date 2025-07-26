@@ -171,6 +171,13 @@ float roll = atan2f(2.0f*(q[0]*q[1] + q[2]*q[3]), q[0]*q[0] - q[1]*q[1] - q[2]*q
 return roll;
 }
 
+float quaternionToYawDegree1(){
+    float w = q[0], x = q[1], y = q[2], z = q[3];
+    float siny_cosp = 2.0f * (w * z + x * y);
+    float cosy_cosp = 1.0f - 2.0f * (y * y + z * z);
+    return atan2f(siny_cosp, cosy_cosp) * (180.0f / 3.14159265f);
+}
+
 float* ekf_getQuaternion(void) {
     return q;
 }
