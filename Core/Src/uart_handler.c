@@ -167,15 +167,15 @@ void uart_handler_send_status(uint16_t status_bits)
 {
     if (!usart1_tx_busy) {
         // Use static buffer for DMA safety
-        status_packet_dma[0] = CMD_HEADER;
+        status_packet_dma[0] = 0xAA;
         status_packet_dma[1] = status_bits & 0xFF;         // Low byte of status
         status_packet_dma[2] = (status_bits >> 8) & 0xFF;  // High byte of status
 
         // Calculate checksum (only for header and status bytes)
         status_packet_dma[3] = (status_packet_dma[0] + status_packet_dma[1] + status_packet_dma[2]) % 256;
 
-        status_packet_dma[4] = CMD_FOOTER1;
-        status_packet_dma[5] = CMD_FOOTER2;
+        status_packet_dma[4] = 0x0D;
+        status_packet_dma[5] = 0x0A;
 
         uart1_send_packet_dma(status_packet_dma, 6);
     }

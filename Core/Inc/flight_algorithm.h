@@ -77,4 +77,8 @@ void flight_algorithm_set_parameters(float launch_accel_threshold,
                                     float main_chute_altitude,
                                     float max_angle_threshold);
 
+
+void deploy_drogue_parachute(void);
+void deploy_main_parachute(void);
+void deploy_parachute_update(void);
 #endif /* INC_FLIGHT_ALGORITHM_H_ */

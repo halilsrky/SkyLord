@@ -109,6 +109,7 @@ static void bme280_begin();
 uint8_t bmi_imu_init(void);
 void IMU_visual();
 void read_ADC();
+void HSD_StatusCheck();
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -182,7 +183,7 @@ int main(void)
 
 	sensor_fusion_init(&BME280_sensor);
 	HAL_UARTEx_ReceiveToIdle_DMA(&huart1, usart1_rx_buffer, 36);
-	flight_algorithm_set_parameters(50.0,2000.0,500.0,60.0);
+	flight_algorithm_set_parameters(10.0,2000.0,500.0,60.0);
 
 
 	uart_handler_init();
@@ -216,7 +217,8 @@ int main(void)
 
 		  if (tx_timer_flag) {
 			tx_timer_flag = 0;
-			read_ADC();
+			//read_ADC();
+			HSD_StatusCheck();
 			//IMU_visual();
 			SystemMode_t current_mode = uart_handler_get_mode();
 
@@ -224,6 +226,8 @@ int main(void)
 					case MODE_NORMAL:
 						sensor_fusion_update_kalman(&BME280_sensor, &BMI_sensor, &sensor_output);
 						flight_algorithm_update(&BME280_sensor, &BMI_sensor, &sensor_output);
+						uint16_t status_bits = flight_algorithm_get_status_bits();
+						uart_handler_send_status(status_bits);
 						break;
 
 					case MODE_SIT:
@@ -623,6 +627,12 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_11, GPIO_PIN_RESET);
 
+  /*Configure GPIO pins : PC0 PC5 */
+  GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_5;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
   /*Configure GPIO pins : PB2 PB10 PB14 */
   GPIO_InitStruct.Pin = GPIO_PIN_2|GPIO_PIN_10|GPIO_PIN_14;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
@@ -775,11 +785,29 @@ void IMU_visual(){
 }
 
 void read_ADC(){
-	int v_current_raw = adc2_buffer[0];
-	int v_voltage_raw = adc1_buffer[0];
+	uint16_t v_current_raw = adc2_buffer[0];
+	uint16_t v_voltage_raw = adc1_buffer[0];
 	// Voltaj
-	sprintf(uart_buffer,"Akim: %d  | Voltaj: %d \r\n", v_current_raw, v_voltage_raw);
+	sprintf(uart_buffer,"Akim: %u  | Voltaj: %u \r\n", v_current_raw, v_voltage_raw);
 	HAL_UART_Transmit(&huart1, (uint8_t*)uart_buffer, strlen(uart_buffer), 100);
+}
+
+void HSD_StatusCheck(){
+	// PC0 pinini oku
+	GPIO_PinState pc0_state = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_0);
+	if (pc0_state == GPIO_PIN_RESET) { // low ise
+		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, GPIO_PIN_RESET); // PB10 LED yak
+	} else {
+		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, GPIO_PIN_SET); // değilse söndür
+	}
+
+	// PC5 pinini oku
+	GPIO_PinState pc5_state = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_5);
+	if (pc5_state == GPIO_PIN_RESET) { // low ise
+		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_SET); // PB2 LED yak
+	} else {
+		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_RESET); // değilse söndür
+	}
 }
 /* USER CODE END 4 */
 
