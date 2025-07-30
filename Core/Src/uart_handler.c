@@ -36,19 +36,19 @@ void uart_handler_init(void)
  */
 void uart_handler_process_packets(void)
 {
-    if (usart1_packet_ready) {
-        usart1_packet_ready = 0; // Clear flag immediately
+    if (usart4_packet_ready) {
+        usart4_packet_ready = 0; // Clear flag immediately
 
         // Command packet (5 bytes with header 0xAA)
-        if (usart1_rx_buffer[0] == CMD_HEADER && usart1_packet_size == 5) {
+        if (usart4_rx_buffer[0] == CMD_HEADER && usart4_packet_size == 5) {
             command_packet_ready = 1;
-            process_command_packet(usart1_rx_buffer);
+            process_command_packet(usart4_rx_buffer);
             //HAL_Delay(1000);
         }
         // SUT data packet (36 bytes with header 0xAB)
-        else if (usart1_rx_buffer[0] == PACKET_HEADER && usart1_packet_size == 36) {
+        else if (usart4_rx_buffer[0] == PACKET_HEADER && usart4_packet_size == 36) {
             sut_packet_ready = 1;
-            process_sut_packet(usart1_rx_buffer);
+            process_sut_packet(usart4_rx_buffer);
         }
     }
 }
@@ -165,7 +165,7 @@ void uart_handler_clear_sut_flag(void)
  */
 void uart_handler_send_status(uint16_t status_bits)
 {
-    if (!usart1_tx_busy) {
+    if (!usart4_tx_busy) {
         // Use static buffer for DMA safety
         status_packet_dma[0] = 0xAA;
         status_packet_dma[1] = status_bits & 0xFF;         // Low byte of status
@@ -177,6 +177,6 @@ void uart_handler_send_status(uint16_t status_bits)
         status_packet_dma[4] = 0x0D;
         status_packet_dma[5] = 0x0A;
 
-        uart1_send_packet_dma(status_packet_dma, 6);
+        uart4_send_packet_dma(status_packet_dma, 6);
     }
 }

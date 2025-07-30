@@ -1,0 +1,4 @@
+../Core/Src/lora.c:6:13:send_command	2
+../Core/Src/lora.c:18:6:lora_activate	1
+../Core/Src/lora.c:24:6:lora_deactivate	1
+../Core/Src/lora.c:30:6:lora_configure	2

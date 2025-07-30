@@ -129,11 +129,6 @@ void flight_algorithm_update(BME_280_t* bme, bmi088_struct_t* bmi, sensor_fusion
                 status_bits |= 0x0004; // Set Bit 2: Minimum altitude threshold exceeded
             }
 
-            if (sensor_fusion->filtered_altitude > min_arming_altitude) {
-                                        is_armed = 1;
-                                        status_bits |= 0x0008; // Set Bit 2: Minimum altitude threshold exceeded
-            }
-
             // Check if angle exceeds threshold
             if (is_armed && (fabs(bmi->datas.angle_y) > max_angle_threshold) && deployed_angle) {
                 drogue_deployed = 1;
@@ -153,7 +148,7 @@ void flight_algorithm_update(BME_280_t* bme, bmi088_struct_t* bmi, sensor_fusion
 
             if (is_armed && sensor_fusion->velocity < 0.0f && sensor_fusion->velocity < prev_velocity && deployed_velocity) {
                 apogee_counter++;
-                if (apogee_counter >= 5) {  // Confirm apogee after 5 consecutive samples
+                if (apogee_counter >= 9) {  // Confirm apogee after 5 consecutive samples
                     status_bits |= 0x0010; // Set Bit 4: Rocket altitude started decreasing
                     status_bits |= 0x0020; // Set Bit 5: Drag parachute deployment command generated
                     drogue_deployed = 1;

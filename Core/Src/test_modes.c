@@ -13,7 +13,7 @@
 // SIT packet buffer
 extern unsigned char sit_paket[36];
 extern sensor_fusion_t sensor_output;
-extern UART_HandleTypeDef huart1;
+extern UART_HandleTypeDef huart4;
 
 
 /**
@@ -30,10 +30,10 @@ void test_modes_init(void)
 void test_modes_handle_sit(BME_280_t* bme, bmi088_struct_t* bmi)
 {
 	addDataPacketSit(bme, bmi);
-   // if (!usart1_tx_busy) {
-       // uart1_send_packet_dma((uint8_t*)sit_paket, 36);
-    	HAL_UART_Transmit(&huart1, (uint8_t*)sit_paket, 36, 100);
-    //}
+    if (!usart4_tx_busy) {
+        uart4_send_packet_dma((uint8_t*)sit_paket, 36);
+    	//HAL_UART_Transmit(&huart4, (uint8_t*)sit_paket, 36, 100);
+    }
 }
 
 

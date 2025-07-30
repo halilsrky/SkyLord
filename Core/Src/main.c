@@ -32,6 +32,8 @@
 #include "uart_handler.h"
 #include "flight_algorithm.h"
 #include "test_modes.h"
+#include "lora.h"
+#include "packet.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -60,16 +62,19 @@ I2C_HandleTypeDef hi2c3;
 
 TIM_HandleTypeDef htim2;
 
+UART_HandleTypeDef huart4;
 UART_HandleTypeDef huart5;
 UART_HandleTypeDef huart1;
-DMA_HandleTypeDef hdma_usart1_rx;
-DMA_HandleTypeDef hdma_usart1_tx;
+UART_HandleTypeDef huart2;
+DMA_HandleTypeDef hdma_uart4_rx;
+DMA_HandleTypeDef hdma_uart4_tx;
 
 /* USER CODE BEGIN PV */
 static BME_280_t BME280_sensor;
 bmi088_struct_t BMI_sensor;
 sensor_fusion_t sensor_output;
-uint8_t usart1_rx_buffer[36];
+static lorastruct e22_lora;
+uint8_t usart4_rx_buffer[36];
 static char uart_buffer[128];
 BME_parameters_t bme_params; // Added global variable for calibration parameters
 uint32_t lastUpdate = 0;
@@ -80,11 +85,12 @@ extern uint8_t Gain;
 extern uint8_t gyroOnlyMode;
 
 
-volatile uint8_t usart1_packet_ready = 0;
-volatile uint16_t usart1_packet_size = 0;
+volatile uint8_t usart4_packet_ready = 0;
+volatile uint16_t usart4_packet_size = 0;
 volatile uint8_t tx_timer_flag = 0;
-volatile uint8_t usart1_tx_busy = 0;
+volatile uint8_t usart4_tx_busy = 0;
 
+extern unsigned char normal_paket[59];
 
 uint16_t adc1_buffer[1];
 uint16_t adc2_buffer[1];
@@ -104,9 +110,12 @@ static void MX_UART5_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_ADC2_Init(void);
+static void MX_UART4_Init(void);
+static void MX_USART2_UART_Init(void);
 /* USER CODE BEGIN PFP */
 static void bme280_begin();
 uint8_t bmi_imu_init(void);
+static void loraBegin();
 void IMU_visual();
 void read_ADC();
 void HSD_StatusCheck();
@@ -154,6 +163,8 @@ int main(void)
   MX_USART1_UART_Init();
   MX_ADC1_Init();
   MX_ADC2_Init();
+  MX_UART4_Init();
+  MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
 
 	MX_TIM2_Init();
@@ -173,16 +184,17 @@ int main(void)
     bmi088_config(&BMI_sensor);
     get_offset(&BMI_sensor);
 	bme280_update();
+    lora_deactivate();
 
 	HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 	getInitialQuaternion();
 
-	//Lora Ayarı
-	//HAL_GPIO_WritePin(GPIOB, GPIO_PIN_8, RESET);
-	//HAL_GPIO_WritePin(GPIOE, GPIO_PIN_6, SET);
+	loraBegin();
+    lora_activate();
+
 
 	sensor_fusion_init(&BME280_sensor);
-	HAL_UARTEx_ReceiveToIdle_DMA(&huart1, usart1_rx_buffer, 36);
+	HAL_UARTEx_ReceiveToIdle_DMA(&huart4, usart4_rx_buffer, 36);
 	flight_algorithm_set_parameters(10.0,2000.0,500.0,60.0);
 
 
@@ -219,15 +231,17 @@ int main(void)
 			tx_timer_flag = 0;
 			//read_ADC();
 			HSD_StatusCheck();
-			//IMU_visual();
+		    //IMU_visual();
 			SystemMode_t current_mode = uart_handler_get_mode();
 
 				switch (current_mode) {
 					case MODE_NORMAL:
 						sensor_fusion_update_kalman(&BME280_sensor, &BMI_sensor, &sensor_output);
 						flight_algorithm_update(&BME280_sensor, &BMI_sensor, &sensor_output);
-						uint16_t status_bits = flight_algorithm_get_status_bits();
-						uart_handler_send_status(status_bits);
+						//addDataPacketNormal(&BME280_sensor, &BMI_sensor);
+				    	//HAL_UART_Transmit(&huart2, (uint8_t*)normal_paket, 59, 100);
+						//uint16_t status_bits = flight_algorithm_get_status_bits();
+						//uart_handler_send_status(status_bits);
 						break;
 
 					case MODE_SIT:
@@ -507,6 +521,39 @@ static void MX_TIM2_Init(void)
 }
 
 /**
+  * @brief UART4 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_UART4_Init(void)
+{
+
+  /* USER CODE BEGIN UART4_Init 0 */
+
+  /* USER CODE END UART4_Init 0 */
+
+  /* USER CODE BEGIN UART4_Init 1 */
+
+  /* USER CODE END UART4_Init 1 */
+  huart4.Instance = UART4;
+  huart4.Init.BaudRate = 115200;
+  huart4.Init.WordLength = UART_WORDLENGTH_8B;
+  huart4.Init.StopBits = UART_STOPBITS_1;
+  huart4.Init.Parity = UART_PARITY_NONE;
+  huart4.Init.Mode = UART_MODE_TX_RX;
+  huart4.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart4.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN UART4_Init 2 */
+
+  /* USER CODE END UART4_Init 2 */
+
+}
+
+/**
   * @brief UART5 Initialization Function
   * @param None
   * @retval None
@@ -573,6 +620,39 @@ static void MX_USART1_UART_Init(void)
 }
 
 /**
+  * @brief USART2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART2_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART2_Init 0 */
+
+  /* USER CODE END USART2_Init 0 */
+
+  /* USER CODE BEGIN USART2_Init 1 */
+
+  /* USER CODE END USART2_Init 1 */
+  huart2.Instance = USART2;
+  huart2.Init.BaudRate = 115200;
+  huart2.Init.WordLength = UART_WORDLENGTH_8B;
+  huart2.Init.StopBits = UART_STOPBITS_1;
+  huart2.Init.Parity = UART_PARITY_NONE;
+  huart2.Init.Mode = UART_MODE_TX_RX;
+  huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart2.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART2_Init 2 */
+
+  /* USER CODE END USART2_Init 2 */
+
+}
+
+/**
   * Enable DMA controller clock
   */
 static void MX_DMA_Init(void)
@@ -580,20 +660,21 @@ static void MX_DMA_Init(void)
 
   /* DMA controller clock enable */
   __HAL_RCC_DMA2_CLK_ENABLE();
+  __HAL_RCC_DMA1_CLK_ENABLE();
 
   /* DMA interrupt init */
+  /* DMA1_Stream2_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream2_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream2_IRQn);
+  /* DMA1_Stream4_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream4_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream4_IRQn);
   /* DMA2_Stream0_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA2_Stream0_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA2_Stream0_IRQn);
   /* DMA2_Stream3_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA2_Stream3_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA2_Stream3_IRQn);
-  /* DMA2_Stream5_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA2_Stream5_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(DMA2_Stream5_IRQn);
-  /* DMA2_Stream7_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA2_Stream7_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(DMA2_Stream7_IRQn);
 
 }
 
@@ -611,30 +692,37 @@ static void MX_GPIO_Init(void)
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOH_CLK_ENABLE();
-  __HAL_RCC_GPIOB_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2|GPIO_PIN_10, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, RF_M0_Pin|RF_M1_Pin|GPIO_PIN_11, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOB, SGU_LED2_Pin|SGU_LED1_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6|MCU_LED_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_11, GPIO_PIN_RESET);
-
-  /*Configure GPIO pins : PC0 PC5 */
-  GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_5;
+  /*Configure GPIO pins : STATUS1_Pin STATUS2_Pin */
+  GPIO_InitStruct.Pin = STATUS1_Pin|STATUS2_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : PB2 PB10 PB14 */
-  GPIO_InitStruct.Pin = GPIO_PIN_2|GPIO_PIN_10|GPIO_PIN_14;
+  /*Configure GPIO pins : RF_M0_Pin RF_M1_Pin PA11 */
+  GPIO_InitStruct.Pin = RF_M0_Pin|RF_M1_Pin|GPIO_PIN_11;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : SGU_LED2_Pin SGU_LED1_Pin PB14 */
+  GPIO_InitStruct.Pin = SGU_LED2_Pin|SGU_LED1_Pin|GPIO_PIN_14;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -646,19 +734,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : PC6 */
-  GPIO_InitStruct.Pin = GPIO_PIN_6;
+  /*Configure GPIO pins : PC6 MCU_LED_Pin */
+  GPIO_InitStruct.Pin = GPIO_PIN_6|MCU_LED_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : PA11 */
-  GPIO_InitStruct.Pin = GPIO_PIN_11;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /*Configure GPIO pin : PA12 */
   GPIO_InitStruct.Pin = GPIO_PIN_12;
@@ -727,12 +808,12 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 {
-    if (huart->Instance == USART1) {
-        usart1_packet_ready = 1;
-        usart1_packet_size = Size;
+    if (huart->Instance == UART4) {
+        usart4_packet_ready = 1;
+        usart4_packet_size = Size;
         // RX DMA'yı tekrar başlat
-        HAL_UARTEx_ReceiveToIdle_DMA(&huart1, usart1_rx_buffer, sizeof(usart1_rx_buffer));
-        __HAL_DMA_DISABLE_IT(huart1.hdmarx, DMA_IT_HT); // Half-transfer interrupt'ı devre dışı bırak
+        HAL_UARTEx_ReceiveToIdle_DMA(&huart4, usart4_rx_buffer, sizeof(usart4_rx_buffer));
+        __HAL_DMA_DISABLE_IT(huart4.hdmarx, DMA_IT_HT); // Half-transfer interrupt'ı devre dışı bırak
     }
 }
 
@@ -740,24 +821,24 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
     if (htim->Instance == TIM2) {
-        tx_timer_flag = 1;
+        tx_timer_flag++;
     }
 }
 
 // USART1 TX DMA tamam callback
 void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
 {
-    if (huart->Instance == USART1) {
-        usart1_tx_busy = 0;
+    if (huart->Instance == UART4) {
+        usart4_tx_busy = 0;
     }
 }
 
 // USART1 TX DMA başlatma fonksiyonu
-void uart1_send_packet_dma(uint8_t *data, uint16_t size)
+void uart4_send_packet_dma(uint8_t *data, uint16_t size)
 {
-    if (!usart1_tx_busy) {
-        usart1_tx_busy = 1;
-        HAL_UART_Transmit_DMA(&huart1, data, size);
+    if (!usart4_tx_busy) {
+        usart4_tx_busy = 1;
+        HAL_UART_Transmit_DMA(&huart4, data, size);
     }
 }
 
@@ -770,17 +851,18 @@ void IMU_visual(){
 	float pitch1 = BMI_sensor.datas.pitch1;
 	float roll1 = BMI_sensor.datas.roll1;
 
+
 	sprintf(uart_buffer, "A1 %.2f %.2f %.2f\r", yaw, pitch, roll);
-	HAL_UART_Transmit(&huart1, (uint8_t*)uart_buffer, strlen(uart_buffer), 100);
+	HAL_UART_Transmit(&huart4, (uint8_t*)uart_buffer, strlen(uart_buffer), 100);
 
 	sprintf(uart_buffer, "A2 %.2f %.2f %.2f\r\n", yaw1, pitch1, roll1);
-	HAL_UART_Transmit(&huart1, (uint8_t*)uart_buffer, strlen(uart_buffer), 100);
+	HAL_UART_Transmit(&huart4, (uint8_t*)uart_buffer, strlen(uart_buffer), 100);
 
 	sprintf(uart_buffer, "G %d\r", Gain);
-	HAL_UART_Transmit(&huart1, (uint8_t*)uart_buffer, strlen(uart_buffer), 100);
+	HAL_UART_Transmit(&huart4, (uint8_t*)uart_buffer, strlen(uart_buffer), 100);
 
 	sprintf(uart_buffer, "M %d\r", gyroOnlyMode);
-	HAL_UART_Transmit(&huart1, (uint8_t*)uart_buffer, strlen(uart_buffer), 100);
+	HAL_UART_Transmit(&huart4, (uint8_t*)uart_buffer, strlen(uart_buffer), 100);
 
 }
 
@@ -794,21 +876,43 @@ void read_ADC(){
 
 void HSD_StatusCheck(){
 	// PC0 pinini oku
-	GPIO_PinState pc0_state = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_0);
+	GPIO_PinState pc0_state = HAL_GPIO_ReadPin(STATUS1_GPIO_Port, STATUS1_Pin);
 	if (pc0_state == GPIO_PIN_RESET) { // low ise
-		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, GPIO_PIN_RESET); // PB10 LED yak
+		HAL_GPIO_WritePin(SGU_LED1_GPIO_Port, SGU_LED1_Pin, GPIO_PIN_SET); // PB10 LED yak
 	} else {
-		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_10, GPIO_PIN_SET); // değilse söndür
+		HAL_GPIO_WritePin(SGU_LED1_GPIO_Port, SGU_LED1_Pin, GPIO_PIN_RESET); // değilse söndür
 	}
 
 	// PC5 pinini oku
 	GPIO_PinState pc5_state = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_5);
 	if (pc5_state == GPIO_PIN_RESET) { // low ise
-		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_SET); // PB2 LED yak
+		HAL_GPIO_WritePin(SGU_LED2_GPIO_Port, SGU_LED2_Pin, GPIO_PIN_SET); // PB2 LED yak
 	} else {
-		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_RESET); // değilse söndür
+		HAL_GPIO_WritePin(SGU_LED2_GPIO_Port, SGU_LED2_Pin, GPIO_PIN_RESET); // değilse söndür
 	}
 }
+
+void loraBegin()
+{
+	HAL_Delay(100);
+
+	HAL_GPIO_WritePin(RF_M0_GPIO_Port, RF_M0_Pin, RESET);
+	HAL_GPIO_WritePin(RF_M1_GPIO_Port, RF_M1_Pin, SET);
+	HAL_Delay(100);
+
+    e22_lora.baudRate = LORA_BAUD_115200;
+    e22_lora.airRate = LORA_AIR_RATE_2_4k;
+    e22_lora.packetSize = LORA_SUB_PACKET_64_BYTES;
+    e22_lora.power = LORA_POWER_37dbm;
+    e22_lora.loraAddress.address16 = 0x0000;
+    e22_lora.loraKey.key16 = 0x0000;
+
+    e22_lora.channel = ROCKET_TELEM_FREQ;
+
+    lora_configure(&e22_lora);
+    HAL_Delay(1000);
+}
+
 /* USER CODE END 4 */
 
 /**

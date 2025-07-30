@@ -100,10 +100,10 @@ void uart_handler_clear_command_flag(void);
 void uart_handler_clear_sut_flag(void);
 
 // External dependencies from main.c
-extern volatile uint8_t usart1_packet_ready;
-extern volatile uint16_t usart1_packet_size;
-extern uint8_t usart1_rx_buffer[36];
-extern volatile uint8_t usart1_tx_busy;
-extern void uart1_send_packet_dma(uint8_t *data, uint16_t size);
+extern volatile uint8_t usart4_packet_ready;
+extern volatile uint16_t usart4_packet_size;
+extern uint8_t usart4_rx_buffer[36];
+extern volatile uint8_t usart4_tx_busy;
+extern void uart4_send_packet_dma(uint8_t *data, uint16_t size);
 
 #endif /* INC_UART_HANDLER_H_ */

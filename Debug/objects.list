@@ -2,6 +2,7 @@
 "./Core/Src/bmi088.o"
 "./Core/Src/flight_algorithm.o"
 "./Core/Src/kalman.o"
+"./Core/Src/lora.o"
 "./Core/Src/main.o"
 "./Core/Src/packet.o"
 "./Core/Src/quaternion.o"
