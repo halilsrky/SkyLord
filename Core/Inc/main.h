@@ -71,6 +71,10 @@ void Error_Handler(void);
 #define SGU_LED1_GPIO_Port GPIOB
 #define MCU_LED_Pin GPIO_PIN_8
 #define MCU_LED_GPIO_Port GPIOC
+#define L86_TX_Pin GPIO_PIN_12
+#define L86_TX_GPIO_Port GPIOC
+#define L86_RX_Pin GPIO_PIN_2
+#define L86_RX_GPIO_Port GPIOD
 
 /* USER CODE BEGIN Private defines */
 

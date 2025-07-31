@@ -2,6 +2,7 @@
 "./Core/Src/bmi088.o"
 "./Core/Src/flight_algorithm.o"
 "./Core/Src/kalman.o"
+"./Core/Src/l86_gnss.o"
 "./Core/Src/lora.o"
 "./Core/Src/main.o"
 "./Core/Src/packet.o"
@@ -36,4 +37,5 @@
 "./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_tim.o"
 "./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_tim_ex.o"
 "./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_uart.o"
+"./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_ll_adc 2.o"
 "./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_ll_adc.o"

@@ -34,6 +34,7 @@
 #include "test_modes.h"
 #include "lora.h"
 #include "packet.h"
+#include "l86_gnss.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -98,6 +99,8 @@ uint16_t adc2_buffer[1];
 float current_mA = 0.0f;
 float voltage_V = 0.0f;
 
+gps_data_t gnss_data;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -120,6 +123,7 @@ static void loraBegin();
 void IMU_visual();
 void read_ADC();
 void HSD_StatusCheck();
+static void L86_GPIO_Init(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -202,6 +206,9 @@ int main(void)
 	uart_handler_init();
 	flight_algorithm_init();
 
+	HAL_UART_Init(&huart5);
+	HAL_DMA_Init(&hdma_uart5_rx);
+	L86_GNSS_Init(&huart5);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -231,6 +238,7 @@ int main(void)
 		  if (tx_timer_flag) {
 			tx_timer_flag = 0;
 			//read_ADC();
+			L86_GNSS_Update(&gnss_data);
 			HSD_StatusCheck();
 		    //IMU_visual();
 			SystemMode_t current_mode = uart_handler_get_mode();
@@ -760,6 +768,7 @@ static void MX_GPIO_Init(void)
   HAL_Delay(50);
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_SET);
   HAL_Delay(50);
+  L86_GPIO_Init();
 /* USER CODE END MX_GPIO_Init_2 */
 }
 
@@ -915,6 +924,26 @@ void loraBegin()
 
     lora_configure(&e22_lora);
     HAL_Delay(1000);
+}
+
+static void L86_GPIO_Init(void)
+{
+	GPIO_InitTypeDef GPIO_InitStruct_UART5_TX;
+	GPIO_InitTypeDef GPIO_InitStruct_UART5_RX;
+
+	GPIO_InitStruct_UART5_TX.Pin = L86_TX_Pin;
+	GPIO_InitStruct_UART5_TX.Mode = GPIO_MODE_AF_PP;
+	GPIO_InitStruct_UART5_TX.Pull = GPIO_NOPULL;
+	GPIO_InitStruct_UART5_TX.Speed = GPIO_SPEED_FREQ_LOW;
+	GPIO_InitStruct_UART5_TX.Alternate = GPIO_AF8_UART5;
+	HAL_GPIO_Init(L86_TX_GPIO_Port, &GPIO_InitStruct_UART5_TX);
+
+	 GPIO_InitStruct_UART5_RX.Pin = L86_RX_Pin;
+	 GPIO_InitStruct_UART5_RX.Mode = GPIO_MODE_AF_PP;
+	 GPIO_InitStruct_UART5_RX.Pull = GPIO_NOPULL;
+	 GPIO_InitStruct_UART5_RX.Speed = GPIO_SPEED_FREQ_LOW;
+	 GPIO_InitStruct_UART5_RX.Alternate = GPIO_AF8_UART5;
+	 HAL_GPIO_Init(L86_RX_GPIO_Port, &GPIO_InitStruct_UART5_RX);
 }
 
 /* USER CODE END 4 */

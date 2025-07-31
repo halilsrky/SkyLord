@@ -1,0 +1,9 @@
+../Core/Src/l86_gnss.c:31:6:L86_GNSS_Init	1
+../Core/Src/l86_gnss.c:37:6:HAL_UART_RxHalfCpltCallback	2
+../Core/Src/l86_gnss.c:45:6:HAL_UART_RxCpltCallback	2
+../Core/Src/l86_gnss.c:53:6:L86_GNSS_Update	1
+../Core/Src/l86_gnss.c:60:6:L86_GNSS_Print_Info	2
+../Core/Src/l86_gnss.c:81:13:process_data	1
+../Core/Src/l86_gnss.c:86:13:get_GNRMC_data	5
+../Core/Src/l86_gnss.c:121:13:get_GPGGA_data	4
+../Core/Src/l86_gnss.c:149:13:format_data	3
