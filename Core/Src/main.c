@@ -208,7 +208,7 @@ int main(void)
 
 	HAL_UART_Init(&huart5);
 	HAL_DMA_Init(&hdma_uart5_rx);
-	L86_GNSS_Init(&huart5);
+	L86_GNSS_Init(&huart5, BAUD_RATE_57600);
   /* USER CODE END 2 */
 
   /* Infinite loop */

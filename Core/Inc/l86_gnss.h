@@ -18,6 +18,10 @@
 #define BUFFER_SIZE 1200
 #define MSG_SIZE 400
 #define DATA_SIZE 120
+#define COMMEND_BUFFER_SIZE 50
+
+#define VALID 'A'
+#define INVALID 'V'
 
 typedef struct gps_data
 {
@@ -45,7 +49,18 @@ typedef struct gps_data
 
 }gps_data_t;
 
-void L86_GNSS_Init(UART_HandleTypeDef *huart);
+typedef enum
+{
+	BAUD_RATE_4800 = (uint32_t)4800,
+	BAUD_RATE_9600 = (uint32_t)9600,
+	BAUD_RATE_14400 = (uint32_t)14400,
+	BAUD_RATE_19200 = (uint32_t)19200,
+	BAUD_RATE_38400 = (uint32_t)38400,
+	BAUD_RATE_57600 = (uint32_t)57600,
+	BAUD_RATE_115200 = (uint32_t)115200,
+}L86_GNSS_BAUD_RATE;
+
+void L86_GNSS_Init(UART_HandleTypeDef *huart, L86_GNSS_BAUD_RATE baud_rate);
 
 void L86_GNSS_Update(gps_data_t *gps_data_);
 

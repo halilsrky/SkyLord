@@ -23,14 +23,17 @@ static float non_formatted_longitude;
 static float non_formatted_time;
 static uint32_t non_formatted_date;
 
+static void set_baud_rate(L86_GNSS_BAUD_RATE baud_rate);
+static uint8_t calculate_checksum(const char *data);
 static void process_data(char *rx_buffer, uint16_t buffer_size);
 static void get_GNRMC_data(gps_data_t *gps_data_);
 static void get_GPGGA_data(gps_data_t *gps_data_);
 static void format_data(gps_data_t *gps_data_);
 
-void L86_GNSS_Init(UART_HandleTypeDef *huart_gnss_)
+void L86_GNSS_Init(UART_HandleTypeDef *huart_gnss_, L86_GNSS_BAUD_RATE baud_rate)
 {
 	huart_gnss = huart_gnss_;
+	set_baud_rate(baud_rate);
 	HAL_UART_Receive_DMA(huart_gnss, (uint8_t *)gnss_rx_buffer, BUFFER_SIZE * 2);
 }
 
@@ -61,7 +64,7 @@ void L86_GNSS_Print_Info(gps_data_t *gps_data_, UART_HandleTypeDef *huart_Seri_P
 {
 	memset(msg, 0, MSG_SIZE);
 
-	if(gps_data_->is_valid == 'A')
+	if(gps_data_->is_valid == VALID)
 	{
 		snprintf(msg, MSG_SIZE, "Latitude: %f %c, Longitude: %f %c, Time: %u.%u.%u, Date: %u/%u/%u\r\n"
 					"Speed: %f, Course: %f, Satellites in use: %u, HDOP: %f, Altitude: %f, Geoid height: %f, Orthometric height: %f\r\n",
@@ -78,6 +81,44 @@ void L86_GNSS_Print_Info(gps_data_t *gps_data_, UART_HandleTypeDef *huart_Seri_P
 	HAL_UART_Transmit(huart_Seri_Port, (uint8_t *)msg, strlen(msg), HAL_MAX_DELAY);
 }
 
+static void set_baud_rate(L86_GNSS_BAUD_RATE baud_rate)
+{
+	char commend_buffer[COMMEND_BUFFER_SIZE];
+
+	memset(commend_buffer, 0, COMMEND_BUFFER_SIZE);
+	snprintf(commend_buffer, COMMEND_BUFFER_SIZE, "PMTK251,%ul", baud_rate);
+	uint8_t checksum = calculate_checksum(commend_buffer);
+
+	memset(commend_buffer, 0, COMMEND_BUFFER_SIZE);
+	snprintf(commend_buffer, COMMEND_BUFFER_SIZE, "$PMTK251,%ul*%02X\r\n", baud_rate, checksum);
+
+	HAL_UART_Transmit(huart_gnss, (uint8_t *)commend_buffer, strlen(commend_buffer), 100);
+	HAL_Delay(100);
+
+	HAL_UART_DeInit(huart_gnss);
+	huart_gnss->Instance = UART5;
+	huart_gnss->Init.BaudRate = baud_rate;
+	huart_gnss->Init.WordLength = UART_WORDLENGTH_8B;
+	huart_gnss->Init.StopBits = UART_STOPBITS_1;
+	huart_gnss->Init.Parity = UART_PARITY_NONE;
+	huart_gnss->Init.Mode = UART_MODE_TX_RX;
+	huart_gnss->Init.HwFlowCtl = UART_HWCONTROL_NONE;
+	huart_gnss->Init.OverSampling = UART_OVERSAMPLING_16;
+	HAL_UART_Init(huart_gnss);
+}
+
+static uint8_t calculate_checksum(const char *data)
+{
+    uint8_t check_sum = 0;
+    int i = 0;
+	while(data[i] != '\0')
+	{
+        check_sum ^= data[i];
+        i++;
+	}
+	return check_sum;
+}
+
 static void process_data(char *rx_buffer, uint16_t buffer_size)
 {
 	memcpy(gps_buffer, rx_buffer, buffer_size);
@@ -87,14 +128,14 @@ static void get_GNRMC_data(gps_data_t *gps_data_)
 {
 	gps_GNRMC_start_point = strstr(gps_buffer, "GNRMC");
 
-	if(gps_GNRMC_start_point != NULL && *(gps_GNRMC_start_point + 17) == 'A')
+	if(gps_GNRMC_start_point != NULL && *(gps_GNRMC_start_point + 17) == VALID)
 	{
 		is_data_valid = 1;
 	}
 	else
 	{
 		is_data_valid = 0;
-		gps_data_->is_valid = 'V';
+		gps_data_->is_valid = INVALID;
 	}
 
 	if(is_data_valid == 1)
@@ -124,7 +165,7 @@ static void get_GPGGA_data(gps_data_t *gps_data_)
 
 	if(gps_GPGGA_start_point != NULL)
 	{
-		if(gps_data_->is_valid == 'A')
+		if(gps_data_->is_valid == VALID)
 		{
 			memset(current_data, 0, DATA_SIZE);
 			counter = 0;
@@ -148,7 +189,7 @@ static void get_GPGGA_data(gps_data_t *gps_data_)
 
 static void format_data(gps_data_t *gps_data_)
 {
-	if(gps_data_->is_valid == 'A')
+	if(gps_data_->is_valid == VALID)
 	{
 		// format latitude
 		non_formatted_latitude = gps_data_->non_fixed_latitude;
