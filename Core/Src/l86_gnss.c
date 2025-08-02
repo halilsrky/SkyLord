@@ -96,7 +96,7 @@ static void set_baud_rate(L86_GNSS_BAUD_RATE baud_rate)
 	HAL_Delay(100);
 
 	HAL_UART_DeInit(huart_gnss);
-	huart_gnss->Instance = UART5;
+	huart_gnss->Instance = GNSS_UART;
 	huart_gnss->Init.BaudRate = baud_rate;
 	huart_gnss->Init.WordLength = UART_WORDLENGTH_8B;
 	huart_gnss->Init.StopBits = UART_STOPBITS_1;

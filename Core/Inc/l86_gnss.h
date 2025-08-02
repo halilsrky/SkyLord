@@ -15,6 +15,8 @@
 #include <math.h>
 #include <stdlib.h>
 
+#define GNSS_UART UART5
+
 #define BUFFER_SIZE 1200
 #define MSG_SIZE 400
 #define DATA_SIZE 120

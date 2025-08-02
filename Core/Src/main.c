@@ -206,7 +206,6 @@ int main(void)
 	uart_handler_init();
 	flight_algorithm_init();
 
-	HAL_UART_Init(&huart5);
 	HAL_DMA_Init(&hdma_uart5_rx);
 	L86_GNSS_Init(&huart5, BAUD_RATE_57600);
   /* USER CODE END 2 */
