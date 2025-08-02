@@ -296,14 +296,12 @@ void bmi088_update(bmi088_struct_t* BMI)
 				BMI->datas.gyro_y = (((float)gyro_y_16 / 32767.0) * (float)(2000 >> BMI->device_config.gyro_range) - BMI->device_config.offsets->gyro_offset[1]) * DEG_TO_RAD;
 				BMI->datas.gyro_z = (((float)gyro_z_16 / 32767.0) * (float)(2000 >> BMI->device_config.gyro_range) - BMI->device_config.offsets->gyro_offset[2]) * DEG_TO_RAD;
 
+
 				Orientation_Update(BMI->datas.gyro_y, -BMI->datas.gyro_x, BMI->datas.gyro_z,BMI->datas.acc_y,-BMI->datas.acc_x,BMI->datas.acc_z, BMI->datas.delta_time);
 				BMI->datas.yaw = quaternionToYaw();
 				BMI->datas.pitch = quaternionToPitch();
 				BMI->datas.roll = quaternionToRoll();
 				BMI->datas.theta = quaternionToThetaZ();
-				BMI->datas.angle_x = quaternionToYawDegree1();
-				BMI->datas.angle_y = quaternionToPitchDegree();
-				BMI->datas.angle_z = quaternionToRollDegree();
 
 				ekf_predict(BMI->datas.gyro_y,-BMI->datas.gyro_x,BMI->datas.gyro_z,BMI->datas.delta_time);
 				BMI->datas.yaw1 = quaternionToYaw1();

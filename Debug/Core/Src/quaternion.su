@@ -1,9 +1,0 @@
-../Core/Src/quaternion.c:11:6:ekf_init	16	static
-../Core/Src/quaternion.c:17:6:ekf_predict	128	static
-../Core/Src/quaternion.c:50:6:ekf_update	528	static
-../Core/Src/quaternion.c:147:7:ekf_getTheta	32	static
-../Core/Src/quaternion.c:159:7:quaternionToYaw1	16	static
-../Core/Src/quaternion.c:164:7:quaternionToPitch1	16	static
-../Core/Src/quaternion.c:169:7:quaternionToRoll1	16	static
-../Core/Src/quaternion.c:174:7:quaternionToYawDegree1	32	static
-../Core/Src/quaternion.c:181:8:ekf_getQuaternion	4	static

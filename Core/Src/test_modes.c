@@ -71,7 +71,7 @@ uint16_t test_modes_handle_sut(sut_data_t* sut_data, sensor_fusion_t* sensor_out
     bmi_sut.datas.acc_y = sut_data->acc_y;
     bmi_sut.datas.acc_z = sut_data->acc_z;
     bmi_sut.datas.gyro_x = sut_data->gyro_x;
-    bmi_sut.datas.angle_y = sut_data->gyro_y;
+    bmi_sut.datas.theta = sut_data->gyro_y;
     bmi_sut.datas.gyro_z = sut_data->gyro_z;
 
     // Process synthetic data through sensor fusion first

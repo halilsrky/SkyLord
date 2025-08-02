@@ -1,5 +1,0 @@
-../Core/Src/sensor_fusion.c:43:14:calculate_accel_std_deviation	32	static
-../Core/Src/sensor_fusion.c:73:16:detect_accel_failure	40	static
-../Core/Src/sensor_fusion.c:127:6:sensor_fusion_init	24	static
-../Core/Src/sensor_fusion.c:154:6:sensor_fusion_update_kalman	48	static
-../Core/Src/sensor_fusion.c:213:6:sensor_fusion_update_mahony	16	static

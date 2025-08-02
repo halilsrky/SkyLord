@@ -1,9 +1,0 @@
-../Core/Src/bme280.c:25:6:bme280_getVals	40	static
-../Core/Src/bme280.c:50:6:bme280_calculate_altitude	16	static
-../Core/Src/bme280.c:61:6:bme280_config	64	static
-../Core/Src/bme280.c:123:6:bme280_init	40	static
-../Core/Src/bme280.c:139:6:bme280_update	360	static
-../Core/Src/bme280.c:206:7:bme280_get_altitude	4	static
-../Core/Src/bme280.c:210:7:bme280_get_pressure	4	static
-../Core/Src/bme280.c:214:7:bme280_get_temperature	4	static
-../Core/Src/bme280.c:218:7:bme280_get_humidity	4	static

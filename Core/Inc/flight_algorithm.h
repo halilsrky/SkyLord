@@ -64,6 +64,7 @@ FlightPhase_t flight_algorithm_get_phase(void);
  * @return Status bits as a 16-bit value
  */
 uint16_t flight_algorithm_get_status_bits(void);
+uint8_t flight_algorithm_get_durum_verisi(void);
 
 /**
  * @brief Set flight parameters

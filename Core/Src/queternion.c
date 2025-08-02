@@ -265,14 +265,13 @@ float quaternionToYawDegree() {
     return atan2f(siny_cosp, cosy_cosp) * (180.0f / 3.14159265f);
 }
 
-float quaternionToPitchDegree() {
+float quaternionToPitchDegree(){
     float w = q[0], x = q[1], y = q[2], z = q[3];
     float sinp = 2.0f * (w * y - z * x);
-    if (fabsf(sinp) >= 1.0f)
-        return (sinp > 0 ? 90.0f : -90.0f); // clamp
-    else
-        return asinf(sinp) * (180.0f / 3.14159265f);
+    float cosp = 1.0f - 2.0f * (y * y + x * x);
+    return atan2f(sinp, cosp) * (180.0f / 3.14159265f);
 }
+
 
 float quaternionToRollDegree(){
     float w = q[0], x = q[1], y = q[2], z = q[3];

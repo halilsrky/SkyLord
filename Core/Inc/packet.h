@@ -9,6 +9,7 @@
 #define INC_PACKET_H_
 
 #include "bmi088.h"
+#include "l86_gnss.h"
 #include "bme280.h"
 
 
@@ -27,7 +28,7 @@ unsigned char check_sum_hesapla_normal(int a);
 unsigned char check_sum_hesapla_sit(int a);
 
 
-void addDataPacketNormal(BME_280_t* BME, bmi088_struct_t* BMI);
+void addDataPacketNormal(BME_280_t* BME, bmi088_struct_t* BMI, gps_data_t* GPS);
 void addDataPacketSit(BME_280_t* BME, bmi088_struct_t* BMI);
 
 float uint8_arrayi_float32_ye_donustur(uint8_t byte_array_u8[4]);
