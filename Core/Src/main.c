@@ -269,23 +269,18 @@ int main(void)
 	flight_algorithm_set_parameters(FLIGHT_ACCEL_THRESHOLD, FLIGHT_MAX_ALTITUDE, FLIGHT_MIN_ALTITUDE, FLIGHT_MAX_VELOCITY);
 	flight_algorithm_init();
 
-<<<<<<< HEAD
-	HAL_DMA_Init(&hdma_uart5_rx);
-	L86_GNSS_Init(&huart5, BAUD_RATE_57600);
-=======
 	/* ==== UART AND COMMUNICATION SETUP ==== */
 	// Initialize UART handler for command processing
 	uart_handler_init();
-	
+
 	// Start UART4 DMA reception for incoming commands
 	HAL_UARTEx_ReceiveToIdle_DMA(&huart4, usart4_rx_buffer, UART_RX_BUFFER_SIZE);
 
 	/* ==== GPS/GNSS INITIALIZATION ==== */
 	// Initialize UART5 and DMA for GPS communication
 	HAL_DMA_Init(&hdma_uart5_rx);
-	L86_GNSS_Init(&huart5);
+	L86_GNSS_Init(&huart5, BAUD_RATE_57600);
 
->>>>>>> c427619 (Yorum satırları güncellendi)
   /* USER CODE END 2 */
 
   /* Infinite loop */
