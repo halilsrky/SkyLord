@@ -279,7 +279,7 @@ int main(void)
 	/* ==== GPS/GNSS INITIALIZATION ==== */
 	// Initialize UART5 and DMA for GPS communication
 	HAL_DMA_Init(&hdma_uart5_rx);
-	L86_GNSS_Init(&huart5, BAUD_RATE_57600);
+	L86_GNSS_Init(&huart5, BAUD_RATE_9600);
 
   /* USER CODE END 2 */
 
@@ -321,9 +321,10 @@ int main(void)
 			
 			// Update GPS/GNSS data for position and velocity tracking
 			L86_GNSS_Update(&gnss_data);
+			//L86_GNSS_Print_Info(&gnss_data, &huart1);
 			
 			// Monitor battery voltage and current consumption
-			read_ADC();
+			//read_ADC();
 
 			// Check high-speed data acquisition status
 			HSD_StatusCheck();
@@ -350,7 +351,7 @@ int main(void)
 					addDataPacketNormal(&BME280_sensor, &BMI_sensor, &gnss_data);
 					
 					/* Optional real-time telemetry transmission (disabled to reduce latency) */
-					//HAL_UART_Transmit(&huart1, (uint8_t*)normal_paket, 59, 100);
+					HAL_UART_Transmit(&huart2, (uint8_t*)normal_paket, 59, 100);
 					//uint16_t status_bits = flight_algorithm_get_status_bits();
 					//uart_handler_send_status(status_bits);
 					break;
@@ -946,7 +947,7 @@ void loraBegin()
 	e22_lora.channel = ROCKET_TELEM_FREQ;
 
 	lora_configure(&e22_lora);
-	HAL_Delay(1000);
+	HAL_Delay(800);
 }
 
 /**

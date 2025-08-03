@@ -33,7 +33,7 @@ static void format_data(gps_data_t *gps_data_);
 void L86_GNSS_Init(UART_HandleTypeDef *huart_gnss_, L86_GNSS_BAUD_RATE baud_rate)
 {
 	huart_gnss = huart_gnss_;
-	set_baud_rate(baud_rate);
+	//set_baud_rate(baud_rate);
 	HAL_UART_Receive_DMA(huart_gnss, (uint8_t *)gnss_rx_buffer, BUFFER_SIZE * 2);
 }
 
