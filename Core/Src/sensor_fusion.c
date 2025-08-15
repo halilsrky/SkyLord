@@ -1,21 +1,19 @@
 /**
  * @file sensor_fusion.c
  * @brief Sensor fusion implementation that uses external Kalman filter
- * @date 2025-07-05 13:48:29
+ * @date 2025-07-05
  * @author halilsrky
  */
-
 #include "sensor_fusion.h"
 #include "kalman.h"
 #include "queternion.h"
 #include "quaternion.h"
-#include "flight_algorithm.h"  // Flight algorithm için include ekledik
+#include "flight_algorithm.h"
 #include <math.h>
 
 /* Private variables */
 static KalmanFilter_t kalman;          // Kalman filter instance from kalman.h
 static uint8_t initialized = 0;        // Flag to track initialization
-static float reference_altitude = 0.0f; // Base reference altitude
 static uint32_t last_kalman_update_time = 0;  // Timestamp of last Kalman update
 static uint32_t flight_start_time = 0;  // Timestamp when flight began (from flight algorithm)
 
@@ -32,9 +30,6 @@ static uint8_t accel_failure_detected = 0;    // Arıza tespit edildi mi?
 #define ACCEL_MAX_STD_THRUST 50.0f      // İtki fazında max std sapma
 #define ACCEL_MAX_VALUE_CRUISE 50.0f    // Seyir fazında max ivme
 #define ACCEL_MAX_STD_CRUISE 15.0f      // Seyir fazında max std sapma
-
-/* External variables from main */
-extern uint8_t tx_timer_flag;  // Timer flag that is set every 100ms
 
 /**
  * @brief İvme değerlerinin standart sapmasını hesapla
@@ -124,7 +119,7 @@ static uint8_t detect_accel_failure(float accel)
 /**
  * @brief Initialize the sensor fusion module
  */
-void sensor_fusion_init(BME_280_t* BME)
+void sensor_fusion_init()
 {
     KalmanFilter_Init(&kalman);
 
@@ -143,7 +138,6 @@ void sensor_fusion_init(BME_280_t* BME)
     accel_failure_detected = 0;
 
     initialized = 1;
-    reference_altitude = BME->base_altitude;
     last_kalman_update_time = HAL_GetTick();
     flight_start_time = 0;
 }
@@ -161,8 +155,6 @@ void sensor_fusion_update_kalman(BME_280_t* BME, bmi088_struct_t* BMI, sensor_fu
 
     // Update the last update time
     last_kalman_update_time = current_time;
-
-    float altitude = BME->altitude;
 
     // Ensure time is valid (never zero or negative)
     if (time_sec <= 0.001f) {
@@ -187,37 +179,14 @@ void sensor_fusion_update_kalman(BME_280_t* BME, bmi088_struct_t* BMI, sensor_fu
         kalman.measurement_noise_acc = 50.0f;
     } else {
         // Normal durum - normal güven
-        kalman.measurement_noise_acc = 0.3f;
+        kalman.measurement_noise_acc = 5.0f;
     }
 
     // Only update if initialized
     if (initialized) {
-        sensor->filtered_altitude = KalmanFilter_Update(&kalman, altitude, accel_z_corrected, time_sec);
+        sensor->filtered_altitude = KalmanFilter_Update(&kalman, BME->altitude, accel_z_corrected, time_sec);
         sensor->apogeeDetect = KalmanFilter_IsApogeeDetected(&kalman);
         sensor->velocity = Kalman_Get_Velocity(&kalman);
-        // Store velocity estimate for later use
-     /*   static float prev_altitude = 0.0f;
-        if (time_sec > 0.001f) {
-            sensor->velocity = (sensor->filtered_altitude - prev_altitude) / time_sec;
-        }
-        prev_altitude = sensor->filtered_altitude;*/
-
-        // Arıza durumunu sensor yapısına ekleyelim (telemetri için kullanılabilir)
         sensor->accel_failure = accel_failure_detected;
     }
-}
-
-/**
- * @brief Update orientation using Mahony filter
- */
-void sensor_fusion_update_mahony(bmi088_struct_t* BMI, sensor_fusion_t *sensor)
-{
-	/*if(BMI->isUpdated){
-		Orientation_Update(BMI->gyro_x, BMI->gyro_y, BMI->gyro_z,BMI->acc_x, BMI->acc_y, BMI->acc_z, BMI->deltaTime);
-		sensor->angle = quaternionToTheta();
-		sensor->yaw = quaternionToYaw();
-		sensor->pitch = quaternionToPitch();
-		sensor->roll = quaternionToRoll();
-		BMI->isUpdated = 0;
-	}*/
 }

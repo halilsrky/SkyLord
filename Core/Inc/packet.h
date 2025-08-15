@@ -11,6 +11,7 @@
 #include "bmi088.h"
 #include "l86_gnss.h"
 #include "bme280.h"
+#include "flight_algorithm.h"
 
 
 typedef union {

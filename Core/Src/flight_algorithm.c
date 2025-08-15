@@ -7,7 +7,7 @@
 
 #include "flight_algorithm.h"
 #include "queternion.h"
-#include "bme280.h"  // This will include main.h which has HAL definitions
+#include "bme280.h"
 #include "main.h"
 #include <math.h>
 
@@ -22,7 +22,7 @@ static FlightPhase_t current_phase = PHASE_IDLE;
 
 // Flight parameters (configurable)
 static float launch_accel_threshold = 15.0f;  // m/s²
-static float min_arming_altitude = 2000.0f;   // meters
+static float min_arming_altitude = 1800.0f;   // meters
 static float main_chute_altitude = 500.0f;    // meters
 static float max_angle_threshold = 70.0f;     // degrees
 
@@ -35,6 +35,7 @@ static uint8_t deployed_velocity = 1;
 static uint8_t drogue_deployed = 0;
 static uint8_t main_deployed = 0;
 int apogee_counter = 0;
+int burnout_counter = 1;
 float prev_velocity = 0;
 
 static uint32_t flight_start_time = 0;
@@ -93,6 +94,7 @@ void flight_algorithm_reset(void)
     drogue_pulse_start_time = 0;
     main_pulse_active = 0;
     main_pulse_start_time = 0;
+    burnout_counter = 1;
 }
 
 /**
@@ -118,14 +120,31 @@ void flight_algorithm_update(BME_280_t* bme, bmi088_struct_t* bmi, sensor_fusion
                 status_bits |= 0x0001; // Set Bit 0: Rocket launch detected
                 durum_verisi = 2;
             }
+            else if(sensor_fusion->velocity > RISING_VELOCITY_TRESHOLD){
+            	current_phase = PHASE_BOOST;
+				is_rising = 1;
+				flight_start_time = HAL_GetTick();
+				status_bits |= 0x0001; // Set Bit 0: Rocket launch detected
+				durum_verisi = 2;
+            }
             break;
 
         case PHASE_BOOST:
-            // After boost phase (typically 3-5 seconds)
-            if (HAL_GetTick() - flight_start_time > 4000) {
+            // After boost phase (typically 7-9 seconds)
+            if (HAL_GetTick() - flight_start_time > 8000) {
                 current_phase = PHASE_COAST;
                 is_stabilized = 1;
                 status_bits |= 0x0002; // Set Bit 1: Motor burn prevention period ended
+                durum_verisi = 3;
+            }
+            if(bmi->datas.acc_x < 0.0 && burnout_counter < 10){
+            	burnout_counter++;
+            }
+            if(burnout_counter == 10){
+                current_phase = PHASE_COAST;
+                is_stabilized = 1;
+                status_bits |= 0x0002; // Set Bit 1: Motor burn prevention period ended
+                durum_verisi = 3;
             }
             break;
 
@@ -134,7 +153,7 @@ void flight_algorithm_update(BME_280_t* bme, bmi088_struct_t* bmi, sensor_fusion
             if (bme->altitude > min_arming_altitude && !is_armed) {
                 is_armed = 1;
                 status_bits |= 0x0004; // Set Bit 2: Minimum altitude threshold exceeded
-                durum_verisi = 3;
+                durum_verisi = 4;
             }
 
             // Check if angle exceeds threshold
@@ -142,7 +161,7 @@ void flight_algorithm_update(BME_280_t* bme, bmi088_struct_t* bmi, sensor_fusion
                 drogue_deployed = 1;
                 deployed_angle = 0;
                 status_bits |= 0x0008; // Set Bit 3: Rocket body angle exceeds threshold
-                durum_verisi = 4;
+                durum_verisi = 5;
                 deploy_drogue_parachute();
             }
 
@@ -163,7 +182,7 @@ void flight_algorithm_update(BME_280_t* bme, bmi088_struct_t* bmi, sensor_fusion
                     drogue_deployed = 1;
                     deployed_velocity = 0;
                     deploy_drogue_parachute();
-                    durum_verisi = 4;
+                    durum_verisi = 6;
                 }
             } else {
                 apogee_counter = 0;
@@ -177,7 +196,7 @@ void flight_algorithm_update(BME_280_t* bme, bmi088_struct_t* bmi, sensor_fusion
                 status_bits |= 0x0080; // Set Bit 7: Main parachute deployment command generated
                 main_deployed = 1;
                 drogue_deployed = 0;
-                durum_verisi = 5;
+                durum_verisi = 7;
                 deploy_main_parachute();
             }
             break;

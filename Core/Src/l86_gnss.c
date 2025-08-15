@@ -23,17 +23,14 @@ static float non_formatted_longitude;
 static float non_formatted_time;
 static uint32_t non_formatted_date;
 
-static void set_baud_rate(L86_GNSS_BAUD_RATE baud_rate);
-static uint8_t calculate_checksum(const char *data);
 static void process_data(char *rx_buffer, uint16_t buffer_size);
 static void get_GNRMC_data(gps_data_t *gps_data_);
 static void get_GPGGA_data(gps_data_t *gps_data_);
 static void format_data(gps_data_t *gps_data_);
 
-void L86_GNSS_Init(UART_HandleTypeDef *huart_gnss_, L86_GNSS_BAUD_RATE baud_rate)
+void L86_GNSS_Init(UART_HandleTypeDef *huart_gnss_)
 {
 	huart_gnss = huart_gnss_;
-	//set_baud_rate(baud_rate);
 	HAL_UART_Receive_DMA(huart_gnss, (uint8_t *)gnss_rx_buffer, BUFFER_SIZE * 2);
 }
 
@@ -79,44 +76,6 @@ void L86_GNSS_Print_Info(gps_data_t *gps_data_, UART_HandleTypeDef *huart_Seri_P
 	}
 
 	HAL_UART_Transmit(huart_Seri_Port, (uint8_t *)msg, strlen(msg), HAL_MAX_DELAY);
-}
-
-static void set_baud_rate(L86_GNSS_BAUD_RATE baud_rate)
-{
-	char commend_buffer[COMMEND_BUFFER_SIZE];
-
-	memset(commend_buffer, 0, COMMEND_BUFFER_SIZE);
-	snprintf(commend_buffer, COMMEND_BUFFER_SIZE, "PMTK251,%ul", baud_rate);
-	uint8_t checksum = calculate_checksum(commend_buffer);
-
-	memset(commend_buffer, 0, COMMEND_BUFFER_SIZE);
-	snprintf(commend_buffer, COMMEND_BUFFER_SIZE, "$PMTK251,%ul*%02X\r\n", baud_rate, checksum);
-
-	HAL_UART_Transmit(huart_gnss, (uint8_t *)commend_buffer, strlen(commend_buffer), 100);
-	HAL_Delay(100);
-
-	HAL_UART_DeInit(huart_gnss);
-	huart_gnss->Instance = GNSS_UART;
-	huart_gnss->Init.BaudRate = baud_rate;
-	huart_gnss->Init.WordLength = UART_WORDLENGTH_8B;
-	huart_gnss->Init.StopBits = UART_STOPBITS_1;
-	huart_gnss->Init.Parity = UART_PARITY_NONE;
-	huart_gnss->Init.Mode = UART_MODE_TX_RX;
-	huart_gnss->Init.HwFlowCtl = UART_HWCONTROL_NONE;
-	huart_gnss->Init.OverSampling = UART_OVERSAMPLING_16;
-	HAL_UART_Init(huart_gnss);
-}
-
-static uint8_t calculate_checksum(const char *data)
-{
-    uint8_t check_sum = 0;
-    int i = 0;
-	while(data[i] != '\0')
-	{
-        check_sum ^= data[i];
-        i++;
-	}
-	return check_sum;
 }
 
 static void process_data(char *rx_buffer, uint16_t buffer_size)

@@ -41,7 +41,7 @@
 
 /* Communication modules */
 #include "uart_handler.h"              // UART command processing
-#include "lora.h"                      // LoRa wireless communication
+#include "e22_lib.h"                   // LoRa wireless communication
 #include "packet.h"                    // Telemetry packet handling
 #include "l86_gnss.h"                  // L86 GPS/GNSS module
 
@@ -93,8 +93,6 @@
 /* Private variables ---------------------------------------------------------*/
 ADC_HandleTypeDef hadc1;
 ADC_HandleTypeDef hadc2;
-DMA_HandleTypeDef hdma_adc1;
-DMA_HandleTypeDef hdma_adc2;
 
 I2C_HandleTypeDef hi2c1;
 I2C_HandleTypeDef hi2c3;
@@ -108,6 +106,7 @@ UART_HandleTypeDef huart2;
 DMA_HandleTypeDef hdma_uart4_rx;
 DMA_HandleTypeDef hdma_uart4_tx;
 DMA_HandleTypeDef hdma_uart5_rx;
+DMA_HandleTypeDef hdma_usart2_tx;
 
 /* USER CODE BEGIN PV */
 
@@ -117,7 +116,7 @@ bmi088_struct_t BMI_sensor;             // BMI088 IMU sensor (accelerometer + gy
 sensor_fusion_t sensor_output;          // Sensor fusion output data
 BME_parameters_t bme_params;             // BME280 calibration parameters
 gps_data_t gnss_data;                  // L86 GNSS receiver data
-static lorastruct e22_lora;             // LoRa module configuration
+static e22_conf_struct_t lora_1;
 
 /* Communication buffers and structures */
 uint8_t usart4_rx_buffer[UART_RX_BUFFER_SIZE];  // UART4 receive buffer
@@ -125,8 +124,6 @@ static char uart_buffer[UART_TX_BUFFER_SIZE];   // General purpose UART buffer f
 extern unsigned char normal_paket[59];  // Normal mode telemetry packet
 
 /* ADC buffers for voltage and current measurement */
-uint16_t adc1_buffer[ADC_BUFFER_SIZE];  // ADC1 buffer for voltage measurement
-uint16_t adc2_buffer[ADC_BUFFER_SIZE];  // ADC2 buffer for current measurement
 float current_mA = 0.0f;               // Processed current value in mA
 float voltage_V = 0.0f;                // Processed voltage value in V
 
@@ -143,8 +140,10 @@ extern uint8_t gyroOnlyMode;           // Gyroscope-only mode flag
 /* Interrupt and communication flags */
 volatile uint8_t usart4_packet_ready = 0;  // UART4 packet received flag
 volatile uint16_t usart4_packet_size = 0;  // Size of received UART4 packet
-volatile uint8_t tx_timer_flag = 0;        // Timer-based transmission flag
+volatile uint8_t tx_timer_flag_100ms = 0;        // Timer-based transmission flag
+volatile uint8_t tx_timer_flag_1s = 0;        // Timer-based transmission flag
 volatile uint8_t usart4_tx_busy = 0;       // UART4 transmission busy flag
+volatile uint8_t usart2_tx_busy = 0;       // UART4 transmission busy flag
 
 /* USER CODE END PV */
 
@@ -166,14 +165,15 @@ static void MX_USART2_UART_Init(void);
 /* Sensor initialization functions */
 static void bme280_begin(void);              // Initialize BME280 barometric sensor
 uint8_t bmi_imu_init(void);                  // Initialize BMI088 IMU sensor
-static void loraBegin(void);                 // Initialize LoRa E22 module
-static void L86_GPIO_Init(void);             // Initialize L86 GPS GPIO pins
+void lora_init(void);                 // Initialize LoRa E22 module
+
 
 /* Utility and debug functions */
 void IMU_visual(void);                       // Send IMU data for visualization
 void read_ADC(void);                         // Read and display ADC values
 void HSD_StatusCheck(void);                  // Check high-speed data status
 void uart4_send_packet_dma(uint8_t *data, uint16_t size);  // Send packet via UART4 DMA
+void lora_send_packet_dma(uint8_t *data, uint16_t size);
 
 /* USER CODE END PFP */
 
@@ -236,11 +236,6 @@ int main(void)
 	// Enable external interrupts for IMU data ready signals
 	HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 
-	/* ==== ADC CONFIGURATION ==== */
-	// Start ADC with DMA for continuous voltage and current monitoring
-	HAL_ADC_Start_DMA(&hadc1, (uint32_t*)adc1_buffer, 1);
-	HAL_ADC_Start_DMA(&hadc2, (uint32_t*)adc2_buffer, 1);
-
 	/* ==== SENSOR INITIALIZATION ==== */
 	// Initialize BME280 barometric pressure sensor
 	bme280_begin();
@@ -257,13 +252,14 @@ int main(void)
 	getInitialQuaternion();
 
 	/* ==== LORA COMMUNICATION SETUP ==== */
-	lora_deactivate();
-	loraBegin();
-	lora_activate();
+    e22_config_mode(&lora_1);
+    HAL_Delay(20);
+	lora_init();
+
 
 	/* ==== SENSOR FUSION AND ALGORITHMS ==== */
 	// Initialize sensor fusion system
-	sensor_fusion_init(&BME280_sensor);
+	sensor_fusion_init();
 	
 	// Configure flight algorithm parameters (accel_threshold, max_altitude, min_altitude, max_velocity)
 	flight_algorithm_set_parameters(FLIGHT_ACCEL_THRESHOLD, FLIGHT_MAX_ALTITUDE, FLIGHT_MIN_ALTITUDE, FLIGHT_MAX_VELOCITY);
@@ -278,8 +274,14 @@ int main(void)
 
 	/* ==== GPS/GNSS INITIALIZATION ==== */
 	// Initialize UART5 and DMA for GPS communication
+	HAL_UART_Transmit(&huart5, (uint8_t*)"$PMTK251,57600*2C\r\n", 19, 100);
+    HAL_UART_DeInit(&huart5);
+    huart5.Init.BaudRate = 57600;
+    HAL_UART_Init(&huart5);
 	HAL_DMA_Init(&hdma_uart5_rx);
-	L86_GNSS_Init(&huart5, BAUD_RATE_9600);
+	L86_GNSS_Init(&huart5);
+
+
 
   /* USER CODE END 2 */
 
@@ -292,13 +294,9 @@ int main(void)
     /* USER CODE BEGIN 3 */
 
 
-
 		/*CONTINUOUS SENSOR UPDATES*/
 		bmi088_update(&BMI_sensor);		// Update IMU sensor data (accelerometer + gyroscope) - High frequency sampling
-		sensor_fusion_update_mahony(&BMI_sensor, &sensor_output); 		// Update sensor fusion with Mahony filter for real-time orientation estimation
 		bme280_update(); 		// Update barometric pressure sensor data for altitude estimation
-
-
 
 		/*COMMAND PROCESSING*/
 		uart_handler_process_packets();		// Process incoming UART packets and handle system mode changes
@@ -316,15 +314,12 @@ int main(void)
 
 
 		/*PERIODIC OPERATIONS (100ms Timer)*/
-		if (tx_timer_flag) {
-			tx_timer_flag = 0;
+		if (tx_timer_flag_100ms) {
+			tx_timer_flag_100ms = 0;
 			
 			// Update GPS/GNSS data for position and velocity tracking
 			L86_GNSS_Update(&gnss_data);
 			//L86_GNSS_Print_Info(&gnss_data, &huart1);
-			
-			// Monitor battery voltage and current consumption
-			//read_ADC();
 
 			// Check high-speed data acquisition status
 			HSD_StatusCheck();
@@ -349,9 +344,9 @@ int main(void)
 					
 					// Package all sensor data into telemetry packet for ground station transmission
 					addDataPacketNormal(&BME280_sensor, &BMI_sensor, &gnss_data);
+					lora_send_packet_dma((uint8_t*)normal_paket, 59);
 					
 					/* Optional real-time telemetry transmission (disabled to reduce latency) */
-					HAL_UART_Transmit(&huart2, (uint8_t*)normal_paket, 59, 100);
 					//uint16_t status_bits = flight_algorithm_get_status_bits();
 					//uart_handler_send_status(status_bits);
 					break;
@@ -371,6 +366,12 @@ int main(void)
 					// TODO: Add error handling for unknown system modes
 					break;
 			}
+		}
+		if(tx_timer_flag_1s >= 10){
+
+			//Monitor battery voltage and current consumption
+			read_ADC();
+
 		}
 	}
   /* USER CODE END 3 */
@@ -778,7 +779,6 @@ static void MX_DMA_Init(void)
 {
 
   /* DMA controller clock enable */
-  __HAL_RCC_DMA2_CLK_ENABLE();
   __HAL_RCC_DMA1_CLK_ENABLE();
 
   /* DMA interrupt init */
@@ -791,12 +791,9 @@ static void MX_DMA_Init(void)
   /* DMA1_Stream4_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Stream4_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream4_IRQn);
-  /* DMA2_Stream0_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA2_Stream0_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(DMA2_Stream0_IRQn);
-  /* DMA2_Stream3_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA2_Stream3_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(DMA2_Stream3_IRQn);
+  /* DMA1_Stream6_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream6_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream6_IRQn);
 
 }
 
@@ -878,7 +875,6 @@ static void MX_GPIO_Init(void)
   HAL_Delay(50);
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_SET);
   HAL_Delay(50);
-  L86_GPIO_Init();
 /* USER CODE END MX_GPIO_Init_2 */
 }
 
@@ -928,52 +924,28 @@ uint8_t bmi_imu_init(void)
  * @brief Initialize LoRa E22 module
  * @note Configures LoRa module for telemetry transmission
  */
-void loraBegin()
+void lora_init(void)
 {
-	HAL_Delay(100);
+	lora_1.baud_rate 		= 	E22_BAUD_RATE_115200;
+	lora_1.parity_bit		=	E22_PARITY_8N1;
+	lora_1.air_rate			=	E22_AIR_DATA_RATE_38400;
+	lora_1.packet_size		=	E22_PACKET_SIZE_64;
+	lora_1.rssi_noise		=	E22_RSSI_NOISE_DISABLE;
+	lora_1.power			=	E22_TRANSMITTING_POWER_22;
+	lora_1.rssi_enable		=	E22_ENABLE_RSSI_DISABLE;
+	lora_1.mode				= 	E22_TRANSMISSION_MODE_TRANSPARENT;
+	lora_1.repeater_func	=	E22_REPEATER_FUNC_DISABLE;
+	lora_1.lbt				=	E22_LBT_DISABLE;
+	lora_1.wor				=	E22_WOR_RECEIVER;
+	lora_1.wor_cycle		=	E22_WOR_CYCLE_1000;
+	lora_1.channel			=	25;
 
-	// Set LoRa module to configuration mode
-	HAL_GPIO_WritePin(RF_M0_GPIO_Port, RF_M0_Pin, LORA_MODE_CONFIG);
-	HAL_GPIO_WritePin(RF_M1_GPIO_Port, RF_M1_Pin, LORA_MODE_ACTIVE);
-	HAL_Delay(100);
+	e22_init(&lora_1, &huart2);
 
-	// Configure LoRa parameters
-	e22_lora.baudRate = LORA_BAUD_115200;
-	e22_lora.airRate = LORA_AIR_RATE_2_4k;
-	e22_lora.packetSize = LORA_SUB_PACKET_64_BYTES;
-	e22_lora.power = LORA_POWER_37dbm;
-	e22_lora.loraAddress.address16 = 0x0000;
-	e22_lora.loraKey.key16 = 0x0000;
-	e22_lora.channel = ROCKET_TELEM_FREQ;
+	HAL_UART_DeInit(&huart2);
+	huart2.Init.BaudRate = 115200;
+	HAL_UART_Init(&huart2);
 
-	lora_configure(&e22_lora);
-	HAL_Delay(800);
-}
-
-/**
- * @brief Initialize L86 GPS module GPIO pins
- * @note Configures UART5 pins for GPS communication
- */
-static void L86_GPIO_Init(void)
-{
-	GPIO_InitTypeDef GPIO_InitStruct_UART5_TX;
-	GPIO_InitTypeDef GPIO_InitStruct_UART5_RX;
-
-	// Configure UART5 TX pin
-	GPIO_InitStruct_UART5_TX.Pin = L86_TX_Pin;
-	GPIO_InitStruct_UART5_TX.Mode = GPIO_MODE_AF_PP;
-	GPIO_InitStruct_UART5_TX.Pull = GPIO_NOPULL;
-	GPIO_InitStruct_UART5_TX.Speed = GPIO_SPEED_FREQ_LOW;
-	GPIO_InitStruct_UART5_TX.Alternate = GPIO_AF8_UART5;
-	HAL_GPIO_Init(L86_TX_GPIO_Port, &GPIO_InitStruct_UART5_TX);
-
-	// Configure UART5 RX pin
-	GPIO_InitStruct_UART5_RX.Pin = L86_RX_Pin;
-	GPIO_InitStruct_UART5_RX.Mode = GPIO_MODE_AF_PP;
-	GPIO_InitStruct_UART5_RX.Pull = GPIO_NOPULL;
-	GPIO_InitStruct_UART5_RX.Speed = GPIO_SPEED_FREQ_LOW;
-	GPIO_InitStruct_UART5_RX.Alternate = GPIO_AF8_UART5;
-	HAL_GPIO_Init(L86_RX_GPIO_Port, &GPIO_InitStruct_UART5_RX);
 }
 
 /**
@@ -1016,7 +988,8 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
 	if (htim->Instance == TIM2) {
-		tx_timer_flag++;
+	    tx_timer_flag_100ms = 1;   // 100ms flag
+	    tx_timer_flag_1s++;      // 1s flag (counts to 10)
 	}
 }
 
@@ -1029,6 +1002,9 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
 {
 	if (huart->Instance == UART4) {
 		usart4_tx_busy = 0;
+	}
+	if (huart->Instance == USART2) {
+		usart2_tx_busy = 0;
 	}
 }
 
@@ -1043,6 +1019,20 @@ void uart4_send_packet_dma(uint8_t *data, uint16_t size)
 	if (!usart4_tx_busy) {
 		usart4_tx_busy = 1;
 		HAL_UART_Transmit_DMA(&huart4, data, size);
+	}
+}
+
+/**
+ * @brief Send packet with LORA using DMA
+ * @param data Pointer to data buffer
+ * @param size Size of data to send
+ * @note Non-blocking transmission using DMA
+ */
+void lora_send_packet_dma(uint8_t *data, uint16_t size)
+{
+	if (!usart2_tx_busy) {
+		usart2_tx_busy = 1;
+		HAL_UART_Transmit_DMA(&huart2, data, size);
 	}
 }
 
@@ -1073,16 +1063,34 @@ void IMU_visual()
 }
 
 /**
- * @brief Read and display ADC values for voltage and current monitoring
- * @note Transmits raw ADC values via UART for debugging
+ * @brief Read ADC values for voltage and current monitoring (optimized)
+ * @note Fast polling mode - reads both ADC1 and ADC2 efficiently
  */
 void read_ADC()
 {
-	uint16_t v_current_raw = adc2_buffer[0];
-	uint16_t v_voltage_raw = adc1_buffer[0];
-	
-	sprintf(uart_buffer, "Akim: %u  | Voltaj: %u \r\n", v_current_raw, v_voltage_raw);
-	HAL_UART_Transmit(&huart1, (uint8_t*)uart_buffer, strlen(uart_buffer), 100);
+    static uint16_t adc1_raw = 0;  // ADC1 değeri (Channel 9)
+    static uint16_t adc2_raw = 0;  // ADC2 değeri (Channel 8)
+
+    // ADC1 okuma
+    HAL_ADC_Start(&hadc1);
+    if (HAL_ADC_PollForConversion(&hadc1, 5) == HAL_OK) {
+        adc1_raw = HAL_ADC_GetValue(&hadc1);
+    }
+    HAL_ADC_Stop(&hadc1);
+
+    // ADC2 okuma
+    HAL_ADC_Start(&hadc2);
+    if (HAL_ADC_PollForConversion(&hadc2, 5) == HAL_OK) {
+        adc2_raw = HAL_ADC_GetValue(&hadc2);
+    }
+    HAL_ADC_Stop(&hadc2);
+
+    // Kalibrasyonlu değerleri hesapla
+    voltage_V = (adc2_raw * 3.3f) / 4096.0f;  // 3.3V referans, 12-bit ADC
+    current_mA = (adc1_raw * 3.3f) / 4096.0f; // Gerekirse akım sensörüne göre kalibre edin
+
+    //sprintf(uart_buffer, "V: %.2fV | I: %.2fmA | ADC1: %u | ADC2: %u\r\n", voltage_V, current_mA, adc1_raw, adc2_raw);
+    //uart4_send_packet_dma((uint8_t*)uart_buffer, strlen(uart_buffer));
 }
 
 /**

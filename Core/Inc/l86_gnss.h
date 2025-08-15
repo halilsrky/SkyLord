@@ -62,7 +62,7 @@ typedef enum
 	BAUD_RATE_115200 = (uint32_t)115200,
 }L86_GNSS_BAUD_RATE;
 
-void L86_GNSS_Init(UART_HandleTypeDef *huart, L86_GNSS_BAUD_RATE baud_rate);
+void L86_GNSS_Init(UART_HandleTypeDef *huart);
 
 void L86_GNSS_Update(gps_data_t *gps_data_);
 
