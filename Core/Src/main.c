@@ -255,7 +255,8 @@ int main(void)
     e22_config_mode(&lora_1);
     HAL_Delay(20);
 	lora_init();
-
+    HAL_Delay(20);
+	e22_transmit_mode(&lora_1);
 
 	/* ==== SENSOR FUSION AND ALGORITHMS ==== */
 	// Initialize sensor fusion system
@@ -344,8 +345,6 @@ int main(void)
 					
 					// Package all sensor data into telemetry packet for ground station transmission
 					addDataPacketNormal(&BME280_sensor, &BMI_sensor, &gnss_data);
-					lora_send_packet_dma((uint8_t*)normal_paket, 59);
-					
 					/* Optional real-time telemetry transmission (disabled to reduce latency) */
 					//uint16_t status_bits = flight_algorithm_get_status_bits();
 					//uart_handler_send_status(status_bits);
@@ -368,7 +367,7 @@ int main(void)
 			}
 		}
 		if(tx_timer_flag_1s >= 10){
-
+			lora_send_packet_dma((uint8_t*)normal_paket, 59);
 			//Monitor battery voltage and current consumption
 			read_ADC();
 
@@ -755,7 +754,7 @@ static void MX_USART2_UART_Init(void)
 
   /* USER CODE END USART2_Init 1 */
   huart2.Instance = USART2;
-  huart2.Init.BaudRate = 115200;
+  huart2.Init.BaudRate = 9600;
   huart2.Init.WordLength = UART_WORDLENGTH_8B;
   huart2.Init.StopBits = UART_STOPBITS_1;
   huart2.Init.Parity = UART_PARITY_NONE;
@@ -943,7 +942,9 @@ void lora_init(void)
 	e22_init(&lora_1, &huart2);
 
 	HAL_UART_DeInit(&huart2);
+	HAL_Delay(20);
 	huart2.Init.BaudRate = 115200;
+	HAL_Delay(20);
 	HAL_UART_Init(&huart2);
 
 }
