@@ -19,6 +19,11 @@ typedef union {
     uint8_t array[4];
 } FLOAT32_UINT8_DONUSTURUCU;
 
+typedef union {
+    uint16_t sayi;
+    uint8_t array[2];
+} UINT16_UINT8_DONUSTURUCU;
+
 
 
 
@@ -29,7 +34,7 @@ unsigned char check_sum_hesapla_normal(int a);
 unsigned char check_sum_hesapla_sit(int a);
 
 
-void addDataPacketNormal(BME_280_t* BME, bmi088_struct_t* BMI, gps_data_t* GPS);
+void addDataPacketNormal(BME_280_t* BME, bmi088_struct_t* BMI, gps_data_t* GPS, sensor_fusion_t* sensor_fusion ,float voltage, float current);
 void addDataPacketSit(BME_280_t* BME, bmi088_struct_t* BMI);
 
 float uint8_arrayi_float32_ye_donustur(uint8_t byte_array_u8[4]);

@@ -121,7 +121,7 @@ static e22_conf_struct_t lora_1;
 /* Communication buffers and structures */
 uint8_t usart4_rx_buffer[UART_RX_BUFFER_SIZE];  // UART4 receive buffer
 static char uart_buffer[UART_TX_BUFFER_SIZE];   // General purpose UART buffer for formatted strings
-extern unsigned char normal_paket[59];  // Normal mode telemetry packet
+extern unsigned char normal_paket[62];  // Normal mode telemetry packet
 
 /* ADC buffers for voltage and current measurement */
 float current_mA = 0.0f;               // Processed current value in mA
@@ -344,7 +344,7 @@ int main(void)
 					flight_algorithm_update(&BME280_sensor, &BMI_sensor, &sensor_output);
 					
 					// Package all sensor data into telemetry packet for ground station transmission
-					addDataPacketNormal(&BME280_sensor, &BMI_sensor, &gnss_data);
+					addDataPacketNormal(&BME280_sensor, &BMI_sensor, &gnss_data, &sensor_output, voltage_V, current_mA);
 					/* Optional real-time telemetry transmission (disabled to reduce latency) */
 					//uint16_t status_bits = flight_algorithm_get_status_bits();
 					//uart_handler_send_status(status_bits);
@@ -367,7 +367,8 @@ int main(void)
 			}
 		}
 		if(tx_timer_flag_1s >= 10){
-			lora_send_packet_dma((uint8_t*)normal_paket, 59);
+			tx_timer_flag_1s = 0;
+			lora_send_packet_dma((uint8_t*)normal_paket, 62);
 			//Monitor battery voltage and current consumption
 			read_ADC();
 
