@@ -13,9 +13,9 @@
 
 //#define SELFTEST_ENABLED
 
-static uint8_t is_time_updated = 0;
-static uint8_t is_starded = 0;
-static uint8_t is_gyro_renewed = 0;
+static volatile uint8_t is_time_updated = 0;
+static volatile uint8_t is_starded = 0;
+static volatile uint8_t is_gyro_renewed = 0;
 
 static int errorLine = 0;
 
@@ -115,6 +115,9 @@ uint8_t bmi088_init(bmi088_struct_t* BMI)
 	uint8_t ret_val = 0;
 	BMI->flags.isGyroUpdated = 0;
 	BMI->flags.isAccelUpdated = 0;
+	BMI->flags.isAccelDmaComplete = 0;
+	BMI->flags.isGyroDmaComplete = 0;
+	BMI->flags.isDmaTransferActive = 0;
 	is_time_updated = 0;
 	is_starded = 0;
 	uint8_t buf[2];
@@ -234,84 +237,84 @@ void bmi088_config(bmi088_struct_t* BMI)
 
 void bmi088_update(bmi088_struct_t* BMI)
 {
-	HAL_StatusTypeDef ret_val = HAL_OK;
-
-		if(BMI->flags.isAccelUpdated)
+	if(BMI->flags.isAccelUpdated && !BMI->flags.isDmaTransferActive)
+	{
+		// Start DMA transfer for accelerometer data (X,Y,Z + sensor time)
+		BMI->flags.isDmaTransferActive = 1;
+		HAL_StatusTypeDef ret = HAL_I2C_Mem_Read_DMA(BMI->device_config.BMI_I2c, ACC_I2C_ADD, ACC_X_LSB, I2C_MEMADD_SIZE_8BIT, BMI->datas.raw_accel_data, 9);
+		if(ret != HAL_OK)
 		{
-			uint8_t raw_accel[9];
-			uint8_t	raw_temp[2];
-
-			ret_val = HAL_I2C_Mem_Read(BMI->device_config.BMI_I2c, ACC_I2C_ADD, ACC_X_LSB, I2C_MEMADD_SIZE_8BIT, raw_accel, 9, 20);
-			ret_val = HAL_I2C_Mem_Read(BMI->device_config.BMI_I2c, ACC_I2C_ADD, ACC_TEMP_MSB, I2C_MEMADD_SIZE_8BIT, raw_temp, 2, 20);
-
-			uint16_t Temp_uint11 = (raw_temp[0] << 3) | (raw_temp[1] >> 5);
-			int16_t Temp_int11 = 0;
-			if (Temp_uint11 > 1023){
-				Temp_int11 = Temp_uint11 - 2048;
-			}
-			else{
-				Temp_int11 = Temp_uint11;
-				BMI->datas.temp = (float)Temp_int11 * 0.125 + 23.0;
-			}
-			uint32_t sensorTime = (raw_accel[8] << 16) | (raw_accel[7] << 8) | raw_accel[6];
-
-			BMI->datas.current_time= (float)sensorTime * 39.0625 / 1000000.0;
-
-			int16_t acc_z_16 = (raw_accel[5] << 8) | raw_accel[4];
-			int16_t acc_y_16 = (raw_accel[3] << 8) | raw_accel[2];
-			int16_t acc_x_16 = (raw_accel[1] << 8) | raw_accel[0];
-
-			BMI->datas.acc_z = ((float)acc_z_16 / 32768.0 * 1000.0 * 1.5 * pow(2.0, (float)(BMI->device_config.acc_range + 1)) - ACCEL_Z_OFFSET)*9.81/1000;
-			BMI->datas.acc_y = ((float)acc_y_16 / 32768.0 * 1000.0 * 1.5 * pow(2.0, (float)(BMI->device_config.acc_range + 1)) - ACCEL_Y_OFFSET)*9.81/1000;
-			BMI->datas.acc_x = ((float)acc_x_16 / 32768.0 * 1000.0 * 1.5 * pow(2.0, (float)(BMI->device_config.acc_range + 1)) - ACCEL_X_OFFSET)*9.81/1000;
-
-			if(is_starded)
-			{
-				BMI->datas.delta_time = BMI->datas.current_time - BMI->datas.last_time < 0 ? 0.0 : BMI->datas.current_time - BMI->datas.last_time;
-			}
-			else
-			{
-				is_starded = 1;
-			}
-
-			BMI->datas.last_time = BMI->datas.current_time;
+			BMI->flags.isDmaTransferActive = 0;
 			BMI->flags.isAccelUpdated = 0;
-			is_time_updated = 1;
 		}
+	}
 
-		if(BMI->flags.isGyroUpdated && is_time_updated)
-		{
-			if(is_starded){
-				uint8_t	raw_gyro[6];
-				ret_val = HAL_I2C_Mem_Read(BMI->device_config.BMI_I2c, GYRO_I2C_ADD, GYRO_RATE_X_LSB, I2C_MEMADD_SIZE_8BIT, raw_gyro, 6, 10);
-
-				if(ret_val)
-					return;
-
-				int16_t gyro_x_16 = (raw_gyro[1] << 8) | raw_gyro[0];
-				int16_t gyro_y_16 = (raw_gyro[3] << 8) | raw_gyro[2];
-				int16_t gyro_z_16 = (raw_gyro[5] << 8) | raw_gyro[4];
-
-				BMI->datas.gyro_x = (((float)gyro_x_16 / 32767.0) * (float)(2000 >> BMI->device_config.gyro_range) - BMI->device_config.offsets->gyro_offset[0]) * DEG_TO_RAD;
-				BMI->datas.gyro_y = (((float)gyro_y_16 / 32767.0) * (float)(2000 >> BMI->device_config.gyro_range) - BMI->device_config.offsets->gyro_offset[1]) * DEG_TO_RAD;
-				BMI->datas.gyro_z = (((float)gyro_z_16 / 32767.0) * (float)(2000 >> BMI->device_config.gyro_range) - BMI->device_config.offsets->gyro_offset[2]) * DEG_TO_RAD;
-
-
-				Orientation_Update(BMI->datas.gyro_y, -BMI->datas.gyro_x, BMI->datas.gyro_z,BMI->datas.acc_y,-BMI->datas.acc_x,BMI->datas.acc_z, BMI->datas.delta_time);
-				BMI->datas.yaw = quaternionToYaw();
-				BMI->datas.pitch = quaternionToPitch();
-				BMI->datas.roll = quaternionToRoll();
-				BMI->datas.theta = quaternionToThetaZ();
-
-				ekf_predict(BMI->datas.gyro_y,-BMI->datas.gyro_x,BMI->datas.gyro_z,BMI->datas.delta_time);
-				BMI->datas.yaw1 = quaternionToYaw1();
-				BMI->datas.pitch1 = quaternionToPitch1();
-				BMI->datas.roll1 = quaternionToRoll1();
-				is_gyro_renewed = 1;
+	if(BMI->flags.isGyroUpdated && !BMI->flags.isDmaTransferActive && is_time_updated)
+	{
+		if(is_starded){
+			// Start DMA transfer for gyroscope data
+			BMI->flags.isDmaTransferActive = 1;
+			HAL_StatusTypeDef ret = HAL_I2C_Mem_Read_DMA(BMI->device_config.BMI_I2c, GYRO_I2C_ADD, GYRO_RATE_X_LSB, I2C_MEMADD_SIZE_8BIT, BMI->datas.raw_gyro_data, 6);
+			if(ret != HAL_OK)
+			{
+				BMI->flags.isDmaTransferActive = 0;
+				BMI->flags.isGyroUpdated = 0;
 			}
-			BMI->flags.isGyroUpdated = 0;
-			is_time_updated = 0;
 		}
+		else
+		{
+			BMI->flags.isGyroUpdated = 0;
+		}
+	}
+
+	// Process accelerometer data if DMA transfer is complete
+	if(BMI->flags.isAccelDmaComplete)
+	{
+		uint32_t sensorTime = (BMI->datas.raw_accel_data[8] << 16) | (BMI->datas.raw_accel_data[7] << 8) | BMI->datas.raw_accel_data[6];
+		BMI->datas.current_time = (float)sensorTime * 39.0625 / 1000000.0;
+
+		int16_t acc_x_16 = (BMI->datas.raw_accel_data[1] << 8) | BMI->datas.raw_accel_data[0];
+		int16_t acc_y_16 = (BMI->datas.raw_accel_data[3] << 8) | BMI->datas.raw_accel_data[2];
+		int16_t acc_z_16 = (BMI->datas.raw_accel_data[5] << 8) | BMI->datas.raw_accel_data[4];
+
+		BMI->datas.acc_x = ((float)acc_x_16 / 32768.0 * 1000.0 * 1.5 * pow(2.0, (float)(BMI->device_config.acc_range + 1)) - ACCEL_X_OFFSET)*9.81/1000;
+		BMI->datas.acc_y = ((float)acc_y_16 / 32768.0 * 1000.0 * 1.5 * pow(2.0, (float)(BMI->device_config.acc_range + 1)) - ACCEL_Y_OFFSET)*9.81/1000;
+		BMI->datas.acc_z = ((float)acc_z_16 / 32768.0 * 1000.0 * 1.5 * pow(2.0, (float)(BMI->device_config.acc_range + 1)) - ACCEL_Z_OFFSET)*9.81/1000;
+
+		if(is_starded)
+		{
+			BMI->datas.delta_time = BMI->datas.current_time - BMI->datas.last_time < 0 ? 0.0 : BMI->datas.current_time - BMI->datas.last_time;
+		}
+		else
+		{
+			is_starded = 1;
+		}
+
+		BMI->datas.last_time = BMI->datas.current_time;
+		BMI->flags.isAccelDmaComplete = 0;
+		is_time_updated = 1;
+
+		// Sıcaklık okuma kaldırıldı - sadece ivme ve gyro verisi kullanılacak
+	}
+
+	// Process gyroscope data if DMA transfer is complete
+	if(BMI->flags.isGyroDmaComplete && is_time_updated)
+	{
+		int16_t gyro_x_16 = (BMI->datas.raw_gyro_data[1] << 8) | BMI->datas.raw_gyro_data[0];
+		int16_t gyro_y_16 = (BMI->datas.raw_gyro_data[3] << 8) | BMI->datas.raw_gyro_data[2];
+		int16_t gyro_z_16 = (BMI->datas.raw_gyro_data[5] << 8) | BMI->datas.raw_gyro_data[4];
+
+		BMI->datas.gyro_x = (((float)gyro_x_16 / 32767.0) * (float)(2000 >> BMI->device_config.gyro_range) - BMI->device_config.offsets->gyro_offset[0]) * DEG_TO_RAD;
+		BMI->datas.gyro_y = (((float)gyro_y_16 / 32767.0) * (float)(2000 >> BMI->device_config.gyro_range) - BMI->device_config.offsets->gyro_offset[1]) * DEG_TO_RAD;
+		BMI->datas.gyro_z = (((float)gyro_z_16 / 32767.0) * (float)(2000 >> BMI->device_config.gyro_range) - BMI->device_config.offsets->gyro_offset[2]) * DEG_TO_RAD;
+
+		Orientation_Update(BMI->datas.gyro_y, -BMI->datas.gyro_x, BMI->datas.gyro_z, BMI->datas.acc_y, -BMI->datas.acc_x, BMI->datas.acc_z, BMI->datas.delta_time);
+		BMI->datas.theta = quaternionToThetaZ();
+		is_gyro_renewed = 1;
+
+		BMI->flags.isGyroDmaComplete = 0;
+		is_time_updated = 0;
+	}
 }
 
 
@@ -335,9 +338,18 @@ uint8_t bmi088_getGyroChipId(bmi088_struct_t* BMI)
 void get_offset(bmi088_struct_t* BMI)
 {
 	int offsetCounter = 0;
+	uint32_t timeout_start = HAL_GetTick();
+	const uint32_t TIMEOUT_MS = 10000; // 10 saniye timeout
 
 	while(1)
 	{
+		// Timeout kontrolü
+		if(HAL_GetTick() - timeout_start > TIMEOUT_MS)
+		{
+
+			return;
+		}
+
 		bmi088_update(BMI);
 		if(is_gyro_renewed == 1)
 		{
@@ -361,4 +373,26 @@ void get_offset(bmi088_struct_t* BMI)
 		}
 
 	}
+}
+
+/**
+ * @brief Accelerometer DMA complete callback
+ * @param BMI Pointer to BMI088 structure
+ */
+void bmi088_accel_dma_complete_callback(bmi088_struct_t* BMI)
+{
+	BMI->flags.isAccelDmaComplete = 1;
+	BMI->flags.isDmaTransferActive = 0;
+	BMI->flags.isAccelUpdated = 0;
+}
+
+/**
+ * @brief Gyroscope DMA complete callback
+ * @param BMI Pointer to BMI088 structure
+ */
+void bmi088_gyro_dma_complete_callback(bmi088_struct_t* BMI)
+{
+	BMI->flags.isGyroDmaComplete = 1;
+	BMI->flags.isDmaTransferActive = 0;
+	BMI->flags.isGyroUpdated = 0;
 }

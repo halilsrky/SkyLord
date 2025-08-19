@@ -96,6 +96,7 @@ ADC_HandleTypeDef hadc2;
 
 I2C_HandleTypeDef hi2c1;
 I2C_HandleTypeDef hi2c3;
+DMA_HandleTypeDef hdma_i2c3_rx;
 
 TIM_HandleTypeDef htim2;
 
@@ -783,6 +784,9 @@ static void MX_DMA_Init(void)
   /* DMA1_Stream0_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Stream0_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream0_IRQn);
+  /* DMA1_Stream1_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream1_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream1_IRQn);
   /* DMA1_Stream2_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Stream2_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream2_IRQn);
@@ -1118,6 +1122,25 @@ void HSD_StatusCheck()
 	} else {
 		HAL_GPIO_WritePin(SGU_LED2_GPIO_Port, SGU_LED2_Pin, LED_OFF);
 	}
+}
+
+/**
+ * @brief I2C Memory read complete callback (DMA)
+ * @param hi2c I2C handle
+ * @note Handles BMI088 sensor data DMA transfer completion
+ */
+void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c)
+{
+    if (hi2c->Instance == I2C1) {
+        if (hi2c->Devaddress == ACC_I2C_ADD) {
+            // Accelerometer data received (9 bytes: XYZ + sensor time)
+            bmi088_accel_dma_complete_callback(&BMI_sensor);
+        }
+        else if (hi2c->Devaddress == GYRO_I2C_ADD) {
+            // Gyroscope data received (6 bytes: XYZ)
+            bmi088_gyro_dma_complete_callback(&BMI_sensor);
+        }
+    }
 }
 
 /* USER CODE END 4 */

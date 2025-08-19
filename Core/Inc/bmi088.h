@@ -173,6 +173,8 @@ extern float roll, pitch, yaw;
 typedef struct bmi088_flag
 {
 	uint8_t isGyroUpdated, isAccelUpdated;
+	uint8_t isAccelDmaComplete, isGyroDmaComplete;
+	uint8_t isDmaTransferActive;
 }bmi088_flag_t;
 
 typedef struct bmi088_offsets
@@ -207,6 +209,9 @@ typedef struct bmi088_datas
 	float temp;
 	float current_time, last_time, delta_time;
 	float vel_x, vel_y, vel_z;
+	uint8_t raw_accel_data[9];
+	uint8_t raw_gyro_data[6];
+	uint8_t raw_temp_data[2];
 }bmi088_datas_t;
 
 typedef struct bmi088_struct
@@ -223,5 +228,8 @@ void bmi088_set_gyro_INT(bmi088_struct_t* BMI);
 void bmi088_set_accel_INT(bmi088_struct_t* BMI);
 void get_offset(bmi088_struct_t* BMI);
 uint8_t bmi088_getGyroChipId(bmi088_struct_t* BMI);
+void bmi088_accel_dma_complete_callback(bmi088_struct_t* BMI);
+void bmi088_gyro_dma_complete_callback(bmi088_struct_t* BMI);
+void bmi088_temp_dma_complete_callback(bmi088_struct_t* BMI);
 
 #endif /* INC_BMI088_H_ */
