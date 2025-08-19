@@ -253,11 +253,11 @@ int main(void)
 	getInitialQuaternion();
 
 	/* ==== LORA COMMUNICATION SETUP ==== */
-    e22_chMode_config(&lora_1);
+    e22_config_mode(&lora_1);
     HAL_Delay(20);
 	lora_init();
     HAL_Delay(20);
-	e22_chMode_transmit(&lora_1);
+	e22_transmit_mode(&lora_1);
 
 	/* ==== SENSOR FUSION AND ALGORITHMS ==== */
 	// Initialize sensor fusion system
@@ -346,6 +346,8 @@ int main(void)
 					
 					// Package all sensor data into telemetry packet for ground station transmission
 					addDataPacketNormal(&BME280_sensor, &BMI_sensor, &gnss_data, &sensor_output, voltage_V, current_mA);
+					HAL_UART_Transmit(&huart1, (uint8_t*)normal_paket, 62, 100);
+
 					/* Optional real-time telemetry transmission (disabled to reduce latency) */
 					//uint16_t status_bits = flight_algorithm_get_status_bits();
 					//uart_handler_send_status(status_bits);
@@ -942,18 +944,14 @@ void lora_init(void)
 	lora_1.wor_cycle		=	E22_WOR_CYCLE_1000;
 	lora_1.channel			=	25;
 
-	lora_1.pins.m0_pin = RF_M0_Pin;
-	lora_1.pins.m0_pin_port = RF_M0_GPIO_Port;
-	lora_1.pins.m1_pin = RF_M1_Pin;
-	lora_1.pins.m1_pin_port = RF_M1_GPIO_Port;
-
 	e22_init(&lora_1, &huart2);
 
 	HAL_UART_DeInit(&huart2);
 	HAL_Delay(20);
-	huart2.Init.BaudRate = 115200;
+	huart4.Init.BaudRate = 115200;
 	HAL_Delay(20);
 	HAL_UART_Init(&huart2);
+
 }
 
 /**

@@ -28,7 +28,7 @@
 #define SECOND_DEPLOY_ALTITUDE 		(float)570.0			//meters		570.0
 
 #define ARMING_ALTITUDE_1			(float)1000.0		//m				1000
-#define RISING_VELOCITY_TRESHOLD	(float)30.0			//m/sn			30.0
+#define RISING_VELOCITY_TRESHOLD	(float)150.0		//m/sn			150.0
 #define ALGORITHM_1_LOCKOUT_TIME	(uint32_t)13000		//ms			13000
 #define FALLING_VELOCITY_TRESHOLD	(float)3.0			//m/sn			3.0
 

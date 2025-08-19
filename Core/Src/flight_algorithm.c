@@ -11,8 +11,6 @@
 #include "main.h"
 #include <math.h>
 
-// External dependencies
-extern int is_BME_ok;
 
 // Private defines
 #define ALT_DECREASE_THRESHOLD   3     // consecutive altitude decreases
@@ -164,15 +162,6 @@ void flight_algorithm_update(BME_280_t* bme, bmi088_struct_t* bmi, sensor_fusion
                 durum_verisi = 5;
                 deploy_drogue_parachute();
             }
-
-            /*     // Detect altitude decrease (apogee)
-            if (is_armed && sensor_fusion->apogeeDetect == 1 && deployed_velocity) {
-                status_bits |= 0x0010; // Set Bit 4: Rocket altitude started decreasing
-                status_bits |= 0x0020; // Set Bit 5: Drag parachute deployment command generated
-                drogue_deployed = 1;
-                deployed_velocity = 0;
-                // deploy_drogue_parachute(); // Actual deployment command
-            }*/
 
             if (is_armed && sensor_fusion->velocity < 0.0f && sensor_fusion->velocity < prev_velocity && deployed_velocity) {
                 apogee_counter++;
