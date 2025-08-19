@@ -252,11 +252,11 @@ int main(void)
 	getInitialQuaternion();
 
 	/* ==== LORA COMMUNICATION SETUP ==== */
-    e22_config_mode(&lora_1);
+    e22_chMode_config(&lora_1);
     HAL_Delay(20);
 	lora_init();
     HAL_Delay(20);
-	e22_transmit_mode(&lora_1);
+	e22_chMode_transmit(&lora_1);
 
 	/* ==== SENSOR FUSION AND ALGORITHMS ==== */
 	// Initialize sensor fusion system
@@ -368,10 +368,8 @@ int main(void)
 		}
 		if(tx_timer_flag_1s >= 10){
 			tx_timer_flag_1s = 0;
-			lora_send_packet_dma((uint8_t*)normal_paket, 62);
-			//Monitor battery voltage and current consumption
 			read_ADC();
-
+			lora_send_packet_dma((uint8_t*)normal_paket, 62);
 		}
 	}
   /* USER CODE END 3 */
@@ -940,6 +938,11 @@ void lora_init(void)
 	lora_1.wor_cycle		=	E22_WOR_CYCLE_1000;
 	lora_1.channel			=	25;
 
+	lora_1.pins.m0_pin = RF_M0_Pin;
+	lora_1.pins.m0_pin_port = RF_M0_GPIO_Port;
+	lora_1.pins.m1_pin = RF_M1_Pin;
+	lora_1.pins.m1_pin_port = RF_M1_GPIO_Port;
+
 	e22_init(&lora_1, &huart2);
 
 	HAL_UART_DeInit(&huart2);
@@ -947,7 +950,6 @@ void lora_init(void)
 	huart2.Init.BaudRate = 115200;
 	HAL_Delay(20);
 	HAL_UART_Init(&huart2);
-
 }
 
 /**
@@ -1088,8 +1090,8 @@ void read_ADC()
     HAL_ADC_Stop(&hadc2);
 
     // Kalibrasyonlu değerleri hesapla
-    voltage_V = (adc2_raw * 3.3f) / 4096.0f;  // 3.3V referans, 12-bit ADC
-    current_mA = (adc1_raw * 3.3f) / 4096.0f; // Gerekirse akım sensörüne göre kalibre edin
+    voltage_V = (adc1_raw * 3.3f) / 4096.0f;  // 3.3V referans, 12-bit ADC
+    current_mA = (adc2_raw * 3.3f) / 4096.0f; // Gerekirse akım sensörüne göre kalibre edin
 
     //sprintf(uart_buffer, "V: %.2fV | I: %.2fmA | ADC1: %u | ADC2: %u\r\n", voltage_V, current_mA, adc1_raw, adc2_raw);
     //uart4_send_packet_dma((uint8_t*)uart_buffer, strlen(uart_buffer));

@@ -11,6 +11,8 @@
 #include <string.h>
 #include "main.h"
 
+//#define DEBUG_TELEM_VIA_TTL	// Uncomment if you want to config your module via pc software via TTL converter.
+
 #define E22_BAUD_RATE_1200 					0x00
 #define E22_BAUD_RATE_2400 					0x01
 #define E22_BAUD_RATE_4800 					0x02
@@ -100,8 +102,7 @@ typedef struct e22ConfStruct
 }e22_conf_struct_t;
 
 void e22_init(e22_conf_struct_t *lora_conf_struct, UART_HandleTypeDef* huart);
-void e22_transmit(e22_conf_struct_t *lora_conf_struct, uint8_t* data, UART_HandleTypeDef* huart, uint16_t len);
-void e22_sleep_mode(e22_conf_struct_t *lora_conf_struct);
-void e22_config_mode(e22_conf_struct_t *lora_conf_struct);
-void e22_transmit_mode(e22_conf_struct_t *lora_conf_struct);
+void e22_chMode_sleep(e22_conf_struct_t *lora_conf_struct);
+void e22_chMode_config(e22_conf_struct_t *lora_conf_struct);
+void e22_chMode_transmit(e22_conf_struct_t *lora_conf_struct);
 #endif /* INC_E22_LIB_H_ */
