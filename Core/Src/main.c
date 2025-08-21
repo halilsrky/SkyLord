@@ -1094,6 +1094,13 @@ void read_ADC()
     // Kalibrasyonlu değerleri hesapla
     voltage_V = (adc1_raw * 13.2f) / 4096.0f;  // 3.3V referans, 12-bit ADC
     current_mA = (adc2_raw * 3.3f) / 4096.0f; // Gerekirse akım sensörüne göre kalibre edin
+
+	if(voltage_V < 7.0){
+		e22_sleep_mode(&lora_1);
+
+	}else if(voltage_V >= 7.0){
+		e22_transmit_mode(&lora_1);
+	}
 }
 
 /**

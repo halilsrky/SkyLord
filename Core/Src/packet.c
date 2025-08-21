@@ -132,14 +132,14 @@ void addDataPacketNormal(BME_280_t* BME, bmi088_struct_t* BMI, gps_data_t* GPS, 
   //VOLT (voltage değerini union ile 2 byte olarak saklıyoruz)
   UINT16_UINT8_DONUSTURUCU voltage_uint16_uint8_donusturucu;
   voltage_uint16_uint8_donusturucu.sayi = (uint16_t)(voltage); // 0.01V hassasiyet
-  normal_paket[53] = voltage_uint16_uint8_donusturucu.array[1]; // High byte
-  normal_paket[54] = voltage_uint16_uint8_donusturucu.array[0]; // Low byte
+  normal_paket[53] = voltage_uint16_uint8_donusturucu.array[0]; // High byte
+  normal_paket[54] = voltage_uint16_uint8_donusturucu.array[1]; // Low byte
 
   //AKİM (current değerini union ile 2 byte olarak saklıyoruz)
   UINT16_UINT8_DONUSTURUCU current_uint16_uint8_donusturucu;
   current_uint16_uint8_donusturucu.sayi = (uint16_t)(current); // 0.001A hassasiyet
-  normal_paket[55] = current_uint16_uint8_donusturucu.array[1]; // High byte
-  normal_paket[56] = current_uint16_uint8_donusturucu.array[0]; // Low byte
+  normal_paket[55] = current_uint16_uint8_donusturucu.array[0]; // High byte
+  normal_paket[56] = current_uint16_uint8_donusturucu.array[1]; // Low byte
 
 
   //NEM
