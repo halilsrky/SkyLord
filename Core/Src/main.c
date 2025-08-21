@@ -454,7 +454,7 @@ static void MX_ADC1_Init(void)
   hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
   hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
   hadc1.Init.NbrOfConversion = 1;
-  hadc1.Init.DMAContinuousRequests = ENABLE;
+  hadc1.Init.DMAContinuousRequests = DISABLE;
   hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
   if (HAL_ADC_Init(&hadc1) != HAL_OK)
   {
@@ -506,7 +506,7 @@ static void MX_ADC2_Init(void)
   hadc2.Init.ExternalTrigConv = ADC_SOFTWARE_START;
   hadc2.Init.DataAlign = ADC_DATAALIGN_RIGHT;
   hadc2.Init.NbrOfConversion = 1;
-  hadc2.Init.DMAContinuousRequests = ENABLE;
+  hadc2.Init.DMAContinuousRequests = DISABLE;
   hadc2.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
   if (HAL_ADC_Init(&hadc2) != HAL_OK)
   {
@@ -948,7 +948,7 @@ void lora_init(void)
 
 	HAL_UART_DeInit(&huart2);
 	HAL_Delay(20);
-	huart4.Init.BaudRate = 115200;
+	huart2.Init.BaudRate = 115200;
 	HAL_Delay(20);
 	HAL_UART_Init(&huart2);
 
@@ -1092,11 +1092,8 @@ void read_ADC()
     HAL_ADC_Stop(&hadc2);
 
     // Kalibrasyonlu değerleri hesapla
-    voltage_V = (adc1_raw * 3.3f) / 4096.0f;  // 3.3V referans, 12-bit ADC
+    voltage_V = (adc1_raw * 13.2f) / 4096.0f;  // 3.3V referans, 12-bit ADC
     current_mA = (adc2_raw * 3.3f) / 4096.0f; // Gerekirse akım sensörüne göre kalibre edin
-
-    //sprintf(uart_buffer, "V: %.2fV | I: %.2fmA | ADC1: %u | ADC2: %u\r\n", voltage_V, current_mA, adc1_raw, adc2_raw);
-    //uart4_send_packet_dma((uint8_t*)uart_buffer, strlen(uart_buffer));
 }
 
 /**
