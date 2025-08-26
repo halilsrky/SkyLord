@@ -19,36 +19,44 @@ static uint8_t packet_buffer[BUFFER_SIZE];
 static uint16_t buffer_index = 0;
 static uint8_t file_opened = 0;
 
-FATFS FatFs; 	//Fatfs handle
-FIL fil; 		//File handle
+// External variables from fatfs.c
+extern FATFS USERFatFS;
+extern FIL USERFile;
+extern char USERPath[4];
 FRESULT fres; 	//Result after operations
 
 //For file operation functions look at https://elm-chan.org/fsw/ff/00index_e.html
 
 void data_logger_init()
 {
-	// SD kartı mount et
-	fres = f_mount(&FatFs, "", 1);
+	// SD kartı mount et - USERPath kullan
+	fres = f_mount(&USERFatFS, USERPath, 1);
 	if (fres != FR_OK) {
 		// Mount başarısız - hata işleme
+		// Debug: fres değerini breakpoint koyup kontrol edin
+		// FR_OK=0, FR_DISK_ERR=1, FR_INT_ERR=2, FR_NOT_READY=3, 
+		// FR_NO_FILE=4, FR_NO_PATH=5, FR_INVALID_NAME=6, FR_DENIED=7,
+		// FR_EXIST=8, FR_INVALID_OBJECT=9, FR_WRITE_PROTECTED=10,
+		// FR_INVALID_DRIVE=11, FR_NOT_ENABLED=12, FR_NO_FILESYSTEM=13
+		volatile FRESULT debug_fres = fres;  // Bu satıra breakpoint koyun
 		return;
 	}
 	
 	// tracker.csv için başlık oluştur
-	fres = f_open(&fil, "tracker.csv", FA_WRITE | FA_OPEN_ALWAYS);
+	fres = f_open(&USERFile, "tracker.csv", FA_WRITE | FA_OPEN_ALWAYS);
 	if (fres == FR_OK) {
-		f_lseek(&fil, f_size(&fil));
+		f_lseek(&USERFile, f_size(&USERFile));
 		unsigned int file_res = 0;
 		uint8_t p_data[300];
 		sprintf((char*) p_data, (char*)"Time,Altitude (m),Lat,Lon,Altitude pressure (m),Temperature (C),Humidity (%%)\n");
-		f_write(&fil, (uint8_t*) p_data, strlen((char*)p_data), &file_res);
-		f_close(&fil);
+		f_write(&USERFile, (uint8_t*) p_data, strlen((char*)p_data), &file_res);
+		f_close(&USERFile);
 	}
 	
 	// packet_data.bin dosyasını oluştur (eğer yoksa)
-	fres = f_open(&fil, "packet_data.bin", FA_WRITE | FA_OPEN_ALWAYS);
+	fres = f_open(&USERFile, "packet_data.bin", FA_WRITE | FA_OPEN_ALWAYS);
 	if (fres == FR_OK) {
-		f_close(&fil);
+		f_close(&USERFile);
 	}
 	
 	// Buffer'ı sıfırla
@@ -57,13 +65,13 @@ void data_logger_init()
 
 void log_datas(float altitude, float lat, float lon, float time, float altitude_pressure, float temperature, float humidity)
 {
-	fres = f_open(&fil, "tracker.csv", FA_WRITE | FA_OPEN_ALWAYS);
-	f_lseek(&fil, f_size(&fil));
+	fres = f_open(&USERFile, "tracker.csv", FA_WRITE | FA_OPEN_ALWAYS);
+	f_lseek(&USERFile, f_size(&USERFile));
 	unsigned int file_res = 0;
 	uint8_t p_data[300];
 	sprintf((char*) p_data, (char*)"%.0f,%.2f,%.6f,%.6f,%.2f,%.2f,%.2f\n", time, altitude, lat, lon,  altitude_pressure, temperature, humidity);
-	f_write(&fil, (uint8_t*) p_data, strlen((char*)p_data), &file_res);
-	f_close(&fil);
+	f_write(&USERFile, (uint8_t*) p_data, strlen((char*)p_data), &file_res);
+	f_close(&USERFile);
 }
 
 void log_normal_packet_data(unsigned char* packet_data)
@@ -82,14 +90,14 @@ void log_normal_packet_data(unsigned char* packet_data)
 void flush_packet_buffer(void)
 {
 	if (buffer_index > 0) {
-		fres = f_open(&fil, "packet_data.bin", FA_WRITE | FA_OPEN_ALWAYS);
+		fres = f_open(&USERFile, "packet_data.bin", FA_WRITE | FA_OPEN_ALWAYS);
 		if (fres == FR_OK) {
-			f_lseek(&fil, f_size(&fil));
+			f_lseek(&USERFile, f_size(&USERFile));
 			unsigned int file_res = 0;
 			
 			// Buffer'daki tüm veriyi yaz
-			f_write(&fil, packet_buffer, buffer_index, &file_res);
-			f_close(&fil);
+			f_write(&USERFile, packet_buffer, buffer_index, &file_res);
+			f_close(&USERFile);
 			
 			// Buffer'ı sıfırla
 			buffer_index = 0;

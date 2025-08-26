@@ -230,7 +230,6 @@ int main(void)
   MX_SPI1_Init();
   MX_FATFS_Init();
   /* USER CODE BEGIN 2 */
-  	  MX_FATFS_Init();
 	/* ==== TIMER AND INTERRUPT CONFIGURATION ==== */
 	// Configure Timer 2 for periodic operations (10ms interval)
 	MX_TIM2_Init();
