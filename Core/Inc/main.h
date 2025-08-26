@@ -63,6 +63,8 @@ void Error_Handler(void);
 #define RF_M0_GPIO_Port GPIOA
 #define RF_M1_Pin GPIO_PIN_1
 #define RF_M1_GPIO_Port GPIOA
+#define SD_CS_Pin GPIO_PIN_4
+#define SD_CS_GPIO_Port GPIOA
 #define STATUS2_Pin GPIO_PIN_5
 #define STATUS2_GPIO_Port GPIOC
 #define SGU_LED2_Pin GPIO_PIN_2
