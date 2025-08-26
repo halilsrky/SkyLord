@@ -6,6 +6,7 @@
  */
 #include "data_logger.h"
 #include "fatfs.h"
+#include "diskio.h"
 #include "stdint.h"
 #include "stdio.h"
 #include "string.h"
@@ -29,6 +30,14 @@ FRESULT fres; 	//Result after operations
 
 void data_logger_init()
 {
+	// Önce disk initialize et
+	DSTATUS disk_status = disk_initialize(0);  // Drive 0
+	if (disk_status != RES_OK) {
+		// Disk initialize başarısız
+		volatile DSTATUS debug_disk_status = disk_status;  // Breakpoint koyun
+		return;
+	}
+	
 	// SD kartı mount et - USERPath kullan
 	fres = f_mount(&USERFatFS, USERPath, 1);
 	if (fres != FR_OK) {

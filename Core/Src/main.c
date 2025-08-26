@@ -289,6 +289,9 @@ int main(void)
 	HAL_DMA_Init(&hdma_uart5_rx);
 	L86_GNSS_Init(&huart5);
 
+	/* ==== DATA LOGGER INITIALIZATION ==== */
+	// SD card needs time to stabilize after power-up
+	HAL_Delay(500);  // 500ms delay for SD card stabilization
 	data_logger_init();
 
   /* USER CODE END 2 */
