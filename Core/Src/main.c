@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "fatfs.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -227,8 +228,9 @@ int main(void)
   MX_UART4_Init();
   MX_USART2_UART_Init();
   MX_SPI1_Init();
+  MX_FATFS_Init();
   /* USER CODE BEGIN 2 */
-
+  	  MX_FATFS_Init();
 	/* ==== TIMER AND INTERRUPT CONFIGURATION ==== */
 	// Configure Timer 2 for periodic operations (10ms interval)
 	MX_TIM2_Init();
