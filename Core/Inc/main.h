@@ -71,6 +71,8 @@ void Error_Handler(void);
 #define SGU_LED2_GPIO_Port GPIOB
 #define SGU_LED1_Pin GPIO_PIN_10
 #define SGU_LED1_GPIO_Port GPIOB
+#define W25_FLASH_CS_Pin GPIO_PIN_12
+#define W25_FLASH_CS_GPIO_Port GPIOB
 #define MCU_LED_Pin GPIO_PIN_8
 #define MCU_LED_GPIO_Port GPIOC
 

@@ -3,6 +3,10 @@
  *
  *  Created on: Jun 7, 2025
  *      Author: yahya
+ *
+ * SD karta kaydedilen dosya formatı:
+ * Her kayıt: [1 byte header (0xAA)] + [4 byte timestamp (ms)] + [50 byte packet data]
+ * Toplam: 55 byte per kayıt
  */
 
 #ifndef INC_DATA_LOGGER_H_

@@ -126,7 +126,7 @@ void sensor_fusion_init()
     // Sensörlerinize göre gürültü değerlerini ayarlayın
     kalman.process_noise = 0.1f;         // Model gürültüsü
     kalman.measurement_noise_alt = 0.005f;  // BME280 yükseklik gürültüsü
-    kalman.measurement_noise_acc = 5.0f;  // BMI088 ivme gürültüsü
+    kalman.measurement_noise_acc = 50.0f;  // BMI088 ivme gürültüsü
 
 
     // İvme arıza tespit değişkenlerini sıfırla
@@ -179,12 +179,12 @@ void sensor_fusion_update_kalman(BME_280_t* BME, bmi088_struct_t* BMI, sensor_fu
         kalman.measurement_noise_acc = 50.0f;
     } else {
         // Normal durum - normal güven
-        kalman.measurement_noise_acc = 5.0f;
+        kalman.measurement_noise_acc = 50.0f;
     }
 
     // Only update if initialized
     if (initialized) {
-        sensor->filtered_altitude = KalmanFilter_Update(&kalman, BME->altitude, accel_z_corrected, time_sec);
+        sensor->filtered_altitude = KalmanFilter_Update(&kalman, BME->altitude, -1000, time_sec);
         sensor->apogeeDetect = KalmanFilter_IsApogeeDetected(&kalman);
         sensor->velocity = Kalman_Get_Velocity(&kalman);
         sensor->accel_failure = accel_failure_detected;

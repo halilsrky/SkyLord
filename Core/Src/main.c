@@ -46,6 +46,8 @@
 #include "packet.h"                    // Telemetry packet handling
 #include "l86_gnss.h"                  // L86 GPS/GNSS module
 #include "data_logger.h"
+#include "dwt_profiler.h"
+#include "w25_flash_memory.h"
 
 /* Test and diagnostic modules */
 #include "test_modes.h"                // System test modes (SIT, SUT)
@@ -101,6 +103,7 @@ I2C_HandleTypeDef hi2c3;
 DMA_HandleTypeDef hdma_i2c3_rx;
 
 SPI_HandleTypeDef hspi1;
+SPI_HandleTypeDef hspi2;
 
 TIM_HandleTypeDef htim2;
 
@@ -141,12 +144,15 @@ uint32_t lastUpdate = 0;               // Last sensor update timestamp
 /* External variables from other modules */
 extern uint8_t Gain;                   // Kalman filter gain parameter
 extern uint8_t gyroOnlyMode;           // Gyroscope-only mode flag
+extern volatile uint8_t tx_timer_flag_w25q;
+extern uint8_t sector_erase_started;
 
 /* Interrupt and communication flags */
 volatile uint8_t usart4_packet_ready = 0;  // UART4 packet received flag
 volatile uint16_t usart4_packet_size = 0;  // Size of received UART4 packet
 volatile uint8_t tx_timer_flag_100ms = 0;        // Timer-based transmission flag
 volatile uint8_t tx_timer_flag_1s = 0;        // Timer-based transmission flag
+volatile uint8_t tx_timer_flag_20s = 0;        // Timer-based transmission flag
 volatile uint8_t usart4_tx_busy = 0;       // UART4 transmission busy flag
 volatile uint8_t usart2_tx_busy = 0;       // UART4 transmission busy flag
 
@@ -166,6 +172,7 @@ static void MX_ADC2_Init(void);
 static void MX_UART4_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_SPI1_Init(void);
+static void MX_SPI2_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* Sensor initialization functions */
@@ -229,6 +236,7 @@ int main(void)
   MX_USART2_UART_Init();
   MX_SPI1_Init();
   MX_FATFS_Init();
+  MX_SPI2_Init();
   /* USER CODE BEGIN 2 */
 	/* ==== TIMER AND INTERRUPT CONFIGURATION ==== */
 	// Configure Timer 2 for periodic operations (10ms interval)
@@ -290,9 +298,9 @@ int main(void)
 	L86_GNSS_Init(&huart5);
 
 	/* ==== DATA LOGGER INITIALIZATION ==== */
-	// SD card needs time to stabilize after power-up
-	HAL_Delay(500);  // 500ms delay for SD card stabilization
+	dwt_profiler_init();
 	data_logger_init();
+	W25Q_Init(&hspi2);
 
   /* USER CODE END 2 */
 
@@ -306,11 +314,18 @@ int main(void)
 
 
 		/*CONTINUOUS SENSOR UPDATES*/
+	    PROFILE_START(PROF_BMI088_UPDATE);
 		bmi088_update(&BMI_sensor);		// Update IMU sensor data (accelerometer + gyroscope) - High frequency sampling
+		PROFILE_END(PROF_BMI088_UPDATE);
+
+		PROFILE_START(PROF_BME280_UPDATE);
 		bme280_update(); 		// Update barometric pressure sensor data for altitude estimation
+		PROFILE_END(PROF_BME280_UPDATE);
 
 		/*COMMAND PROCESSING*/
+		PROFILE_START(PROF_TEST);
 		uart_handler_process_packets();		// Process incoming UART packets and handle system mode changes
+		PROFILE_END(PROF_TEST);
 
 		// Handle command processing and system state transitions
 		if (uart_handler_command_ready()) {
@@ -321,7 +336,7 @@ int main(void)
 				flight_algorithm_reset();
 			}
 		}
-		
+
 
 
 		/*PERIODIC OPERATIONS (100ms Timer)*/
@@ -329,8 +344,10 @@ int main(void)
 			tx_timer_flag_100ms = 0;
 			
 			// Update GPS/GNSS data for position and velocity tracking
+			PROFILE_START(PROF_GNSS_UPDATE);
 			L86_GNSS_Update(&gnss_data);
 			//L86_GNSS_Print_Info(&gnss_data, &huart1);
+			PROFILE_END(PROF_GNSS_UPDATE);
 
 
 
@@ -350,16 +367,33 @@ int main(void)
 					/* Full operational flight mode with complete sensor fusion and flight control */
 					
 					// Enhanced sensor fusion using Kalman filter for precise state estimation
+					PROFILE_START(PROF_SENSOR_FUSION);
 					sensor_fusion_update_kalman(&BME280_sensor, &BMI_sensor, &sensor_output);
-					
+					PROFILE_END(PROF_SENSOR_FUSION);
+
 					// Execute flight algorithm for launch detection, apogee detection, and recovery deployment
+					PROFILE_START(PROF_FLIGHT_ALGORITHM);
 					flight_algorithm_update(&BME280_sensor, &BMI_sensor, &sensor_output);
+					PROFILE_END(PROF_FLIGHT_ALGORITHM);
 					
 					// Package all sensor data into telemetry packet for ground station transmission
+					PROFILE_START(PROF_PACKET_COMPOSE);
 					addDataPacketNormal(&BME280_sensor, &BMI_sensor, &gnss_data, &sensor_output, voltage_V, current_mA);
+					PROFILE_END(PROF_PACKET_COMPOSE);
+
+					//HAL_UART_Transmit(&huart1, (uint8_t*)normal_paket, 62, 100);
+					PROFILE_START(PROF_SD_LOGGER);
+					log_normal_packet_data(normal_paket);
+					PROFILE_END(PROF_SD_LOGGER);
+
+					PROFILE_START(PROF_FLASH);
+					//W25Q_WriteToBufferFlushOnSectorFull(normal_paket);
+					PROFILE_END(PROF_FLASH);
+
 					HAL_UART_Transmit(&huart1, (uint8_t*)normal_paket, 62, 100);
 
-					log_normal_packet_data(normal_paket);
+					//dwt_profiler_print_compact();
+
 					/* Optional real-time telemetry transmission (disabled to reduce latency) */
 					//uint16_t status_bits = flight_algorithm_get_status_bits();
 					//uart_handler_send_status(status_bits);
@@ -385,6 +419,10 @@ int main(void)
 			tx_timer_flag_1s = 0;
 			read_ADC();
 			lora_send_packet_dma((uint8_t*)normal_paket, 62);
+		}
+		if(tx_timer_flag_20s >= 200){
+			tx_timer_flag_20s = 0;
+	        HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_6);
 		}
 	}
   /* USER CODE END 3 */
@@ -647,6 +685,44 @@ static void MX_SPI1_Init(void)
 }
 
 /**
+  * @brief SPI2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_SPI2_Init(void)
+{
+
+  /* USER CODE BEGIN SPI2_Init 0 */
+
+  /* USER CODE END SPI2_Init 0 */
+
+  /* USER CODE BEGIN SPI2_Init 1 */
+
+  /* USER CODE END SPI2_Init 1 */
+  /* SPI2 parameter configuration*/
+  hspi2.Instance = SPI2;
+  hspi2.Init.Mode = SPI_MODE_MASTER;
+  hspi2.Init.Direction = SPI_DIRECTION_2LINES;
+  hspi2.Init.DataSize = SPI_DATASIZE_8BIT;
+  hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;
+  hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;
+  hspi2.Init.NSS = SPI_NSS_SOFT;
+  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+  hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
+  hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
+  hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi2.Init.CRCPolynomial = 10;
+  if (HAL_SPI_Init(&hspi2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN SPI2_Init 2 */
+
+  /* USER CODE END SPI2_Init 2 */
+
+}
+
+/**
   * @brief TIM2 Initialization Function
   * @param None
   * @retval None
@@ -873,7 +949,7 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(GPIOA, RF_M0_Pin|RF_M1_Pin|SD_CS_Pin|GPIO_PIN_11, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, SGU_LED2_Pin|SGU_LED1_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, SGU_LED2_Pin|SGU_LED1_Pin|W25_FLASH_CS_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_SET);
@@ -887,12 +963,19 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : RF_M0_Pin RF_M1_Pin SD_CS_Pin PA11 */
-  GPIO_InitStruct.Pin = RF_M0_Pin|RF_M1_Pin|SD_CS_Pin|GPIO_PIN_11;
+  /*Configure GPIO pins : RF_M0_Pin RF_M1_Pin PA11 */
+  GPIO_InitStruct.Pin = RF_M0_Pin|RF_M1_Pin|GPIO_PIN_11;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : SD_CS_Pin */
+  GPIO_InitStruct.Pin = SD_CS_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+  HAL_GPIO_Init(SD_CS_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : SGU_LED2_Pin SGU_LED1_Pin PB14 */
   GPIO_InitStruct.Pin = SGU_LED2_Pin|SGU_LED1_Pin|GPIO_PIN_14;
@@ -900,6 +983,13 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : W25_FLASH_CS_Pin */
+  GPIO_InitStruct.Pin = W25_FLASH_CS_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+  HAL_GPIO_Init(W25_FLASH_CS_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : PB13 */
   GPIO_InitStruct.Pin = GPIO_PIN_13;
@@ -1046,6 +1136,12 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 	if (htim->Instance == TIM2) {
 	    tx_timer_flag_100ms = 1;   // 100ms flag
 	    tx_timer_flag_1s++;      // 1s flag (counts to 10)
+	    tx_timer_flag_20s++;
+	    if(sector_erase_started == 1)
+		{
+			tx_timer_flag_w25q++;
+		}
+
 	}
 }
 
