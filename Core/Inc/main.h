@@ -59,6 +59,8 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define STATUS1_Pin GPIO_PIN_0
 #define STATUS1_GPIO_Port GPIOC
+#define CAMERA_Pin GPIO_PIN_1
+#define CAMERA_GPIO_Port GPIOC
 #define RF_M0_Pin GPIO_PIN_0
 #define RF_M0_GPIO_Port GPIOA
 #define RF_M1_Pin GPIO_PIN_1
@@ -73,8 +75,14 @@ void Error_Handler(void);
 #define SGU_LED1_GPIO_Port GPIOB
 #define W25_FLASH_CS_Pin GPIO_PIN_12
 #define W25_FLASH_CS_GPIO_Port GPIOB
+#define KURTARMA1_Pin GPIO_PIN_6
+#define KURTARMA1_GPIO_Port GPIOC
 #define MCU_LED_Pin GPIO_PIN_8
 #define MCU_LED_GPIO_Port GPIOC
+#define KURTARMA2_Pin GPIO_PIN_11
+#define KURTARMA2_GPIO_Port GPIOA
+#define BUZZER_Pin GPIO_PIN_15
+#define BUZZER_GPIO_Port GPIOA
 
 /* USER CODE BEGIN Private defines */
 #define L86_TX_Pin GPIO_PIN_12

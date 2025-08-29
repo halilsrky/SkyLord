@@ -9,21 +9,20 @@
 #include "stdint.h"
 #include "stdio.h"
 #include "string.h"
-#include "stm32f4xx_hal.h"  // HAL_GetTick() için
+#include "stm32f4xx_hal.h"
 
 // Buffer için tanımlamalar
-#define PACKET_SIZE 62
-#define HEADER_SIZE 1     // 1 byte header
-#define TIMESTAMP_SIZE 4  // 4 byte timestamp (uint32_t)
-#define PACKET_WITH_HEADER_TIMESTAMP_SIZE (HEADER_SIZE + TIMESTAMP_SIZE + PACKET_SIZE)
-#define PACKETS_PER_SECTOR 7  // 9 paket = 495 byte (512'den küçük)
-#define BUFFER_SIZE (PACKET_WITH_HEADER_TIMESTAMP_SIZE * PACKETS_PER_SECTOR)
-
-// Header değerleri
-#define PACKET_HEADER 0xAA  // Paket başlangıcını belirten header
+#define PACKET_SIZE 64
+#define PACKETS_PER_SECTOR 8  // 8 paket = 512 byte
+#define BUFFER_SIZE (PACKET_SIZE * PACKETS_PER_SECTOR)
+#define FLUSH_THRESHOLD 10  // 10 kez buffer dolunca dosyayı kapat
 
 static uint8_t packet_buffer[BUFFER_SIZE];
 static uint16_t buffer_index = 0;
+static uint8_t flush_counter = 0;  // Kaç kez buffer dolduğunu sayar
+static uint8_t file_open = 0;  // Dosya açık mı?
+static uint8_t sd_open = 1;  // Dosya açık mı?
+
 
 FATFS FatFs; 	//Fatfs handle
 FIL fil; 		//File handle
@@ -36,59 +35,90 @@ void data_logger_init()
 	// SD kartı mount et
 	fres = f_mount(&FatFs, "", 1);
 	if (fres != FR_OK) {
-		// Mount başarısız - hata işleme
+		sd_open = 0;
 		return;
 	}
 	
 	// packets.bin dosyasını oluştur (eğer yoksa)
-	fres = f_open(&fil, "packets.bin", FA_WRITE | FA_OPEN_ALWAYS);
+	fres = f_open(&fil, "skylord.bin", FA_WRITE | FA_OPEN_ALWAYS);
 	if (fres == FR_OK) {
 		f_close(&fil);
 	}
 	
 	// Buffer'ı sıfırla
 	buffer_index = 0;
+	flush_counter = 0;
+	file_open = 0;
 }
 
 void log_normal_packet_data(unsigned char* packet_data)
 {
-	// Mevcut timestamp'i al (ms cinsinden)
-	uint32_t timestamp = HAL_GetTick();
 
-	// Önce header'ı buffer'a yaz (1 byte)
-	packet_buffer[buffer_index] = PACKET_HEADER;
-	buffer_index += HEADER_SIZE;
+	if (sd_open == 0) {
+		return;
+	}
 
-	// Sonra timestamp'i buffer'a yaz (4 byte)
-	memcpy(&packet_buffer[buffer_index], &timestamp, TIMESTAMP_SIZE);
-	buffer_index += TIMESTAMP_SIZE;
-
-	// Son olarak paketi buffer'a kopyala (50 byte)
+	// Paketi buffer'a kopyala
 	memcpy(&packet_buffer[buffer_index], packet_data, PACKET_SIZE);
 	buffer_index += PACKET_SIZE;
 	
 	// Buffer doldu mu kontrol et
 	if (buffer_index >= BUFFER_SIZE) {
-		// Buffer'ı SD karta yaz
-		flush_packet_buffer();
+		// Dosya açık değilse aç
+		if (!file_open) {
+			fres = f_open(&fil, "skylord.bin", FA_WRITE | FA_OPEN_ALWAYS);
+			if (fres == FR_OK) {
+				f_lseek(&fil, f_size(&fil));  // Dosya sonuna git
+				file_open = 1;
+			} else {
+				sd_open = 0;
+				buffer_index = 0;
+				return;
+			}
+		}
+
+		// Buffer'ı dosyaya yaz
+		unsigned int file_res = 0;
+		f_write(&fil, packet_buffer, buffer_index, &file_res);
+
+		// Buffer'ı sıfırla ve sayacı artır
+		buffer_index = 0;
+		flush_counter++;
+
+		// 10 kez yazım yapıldıysa dosyayı kapat
+		if (flush_counter >= FLUSH_THRESHOLD) {
+			f_close(&fil);
+			file_open = 0;
+			flush_counter = 0;
+		}
 	}
 }
 
 void flush_packet_buffer(void)
 {
+	// Eğer buffer'da veri varsa yaz
 	if (buffer_index > 0) {
-		fres = f_open(&fil, "packets.bin", FA_WRITE | FA_OPEN_ALWAYS);
-		if (fres == FR_OK) {
-			f_lseek(&fil, f_size(&fil));
+		// Dosya açık değilse aç
+		if (!file_open) {
+			fres = f_open(&fil, "skylord.bin", FA_WRITE | FA_OPEN_ALWAYS);
+			if (fres == FR_OK) {
+				f_lseek(&fil, f_size(&fil));
+				file_open = 1;
+			}
+		}
+
+		if (file_open) {
 			unsigned int file_res = 0;
-			
-			// Buffer'daki tüm veriyi yaz
 			f_write(&fil, packet_buffer, buffer_index, &file_res);
-			f_close(&fil);
-			
-			// Buffer'ı sıfırla
 			buffer_index = 0;
 		}
+	}
+
+	// Dosya açıksa kapat
+	if (file_open) {
+		f_close(&fil);
+		file_open = 0;
+		flush_counter = 0;
 	}
 }
 

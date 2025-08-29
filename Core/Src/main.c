@@ -73,7 +73,7 @@
 #define UART_TX_BUFFER_SIZE            128     // General UART transmit buffer size
 
 /* Flight algorithm parameters */
-#define FLIGHT_ACCEL_THRESHOLD         15.0f   // Acceleration threshold for launch detection (m/s²)
+#define FLIGHT_ACCEL_THRESHOLD         25.0f   // Acceleration threshold for launch detection (m/s²)
 #define FLIGHT_MAX_ALTITUDE            2000.0f // Maximum expected altitude (m)
 #define FLIGHT_MIN_ALTITUDE            500.0f  // Minimum altitude for descent detection (m)
 #define FLIGHT_MAX_VELOCITY            60.0f   // Maximum expected velocity (m/s)
@@ -130,6 +130,8 @@ static e22_conf_struct_t lora_1;
 uint8_t usart4_rx_buffer[UART_RX_BUFFER_SIZE];  // UART4 receive buffer
 static char uart_buffer[UART_TX_BUFFER_SIZE];   // General purpose UART buffer for formatted strings
 extern unsigned char normal_paket[62];  // Normal mode telemetry packet
+extern unsigned char sd_paket[64];  // Normal mode telemetry packet
+uint8_t sector_buffer[4096];
 
 /* ADC buffers for voltage and current measurement */
 float current_mA = 0.0f;               // Processed current value in mA
@@ -302,6 +304,12 @@ int main(void)
 	data_logger_init();
 	W25Q_Init(&hspi2);
 
+	HAL_GPIO_WritePin(CAMERA_GPIO_Port, CAMERA_Pin, SET);
+    HAL_Delay(30);
+    HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin, SET);
+    HAL_Delay(300);
+    HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin, RESET);
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -314,18 +322,18 @@ int main(void)
 
 
 		/*CONTINUOUS SENSOR UPDATES*/
-	    PROFILE_START(PROF_BMI088_UPDATE);
+	    //PROFILE_START(PROF_BMI088_UPDATE);
 		bmi088_update(&BMI_sensor);		// Update IMU sensor data (accelerometer + gyroscope) - High frequency sampling
-		PROFILE_END(PROF_BMI088_UPDATE);
+		//PROFILE_END(PROF_BMI088_UPDATE);
 
-		PROFILE_START(PROF_BME280_UPDATE);
+		//PROFILE_START(PROF_BME280_UPDATE);
 		bme280_update(); 		// Update barometric pressure sensor data for altitude estimation
-		PROFILE_END(PROF_BME280_UPDATE);
+		//PROFILE_END(PROF_BME280_UPDATE);
 
 		/*COMMAND PROCESSING*/
-		PROFILE_START(PROF_TEST);
+		//PROFILE_START(PROF_TEST);
 		uart_handler_process_packets();		// Process incoming UART packets and handle system mode changes
-		PROFILE_END(PROF_TEST);
+		//PROFILE_END(PROF_TEST);
 
 		// Handle command processing and system state transitions
 		if (uart_handler_command_ready()) {
@@ -344,11 +352,10 @@ int main(void)
 			tx_timer_flag_100ms = 0;
 			
 			// Update GPS/GNSS data for position and velocity tracking
-			PROFILE_START(PROF_GNSS_UPDATE);
+			//PROFILE_START(PROF_GNSS_UPDATE);
 			L86_GNSS_Update(&gnss_data);
 			//L86_GNSS_Print_Info(&gnss_data, &huart1);
-			PROFILE_END(PROF_GNSS_UPDATE);
-
+			//PROFILE_END(PROF_GNSS_UPDATE);
 
 
 			// Check high-speed data acquisition status
@@ -366,33 +373,39 @@ int main(void)
 				case MODE_NORMAL:
 					/* Full operational flight mode with complete sensor fusion and flight control */
 					
+					read_ADC();
+
 					// Enhanced sensor fusion using Kalman filter for precise state estimation
-					PROFILE_START(PROF_SENSOR_FUSION);
+					//PROFILE_START(PROF_SENSOR_FUSION);
 					sensor_fusion_update_kalman(&BME280_sensor, &BMI_sensor, &sensor_output);
-					PROFILE_END(PROF_SENSOR_FUSION);
+					//PROFILE_END(PROF_SENSOR_FUSION);
 
 					// Execute flight algorithm for launch detection, apogee detection, and recovery deployment
-					PROFILE_START(PROF_FLIGHT_ALGORITHM);
+					//PROFILE_START(PROF_FLIGHT_ALGORITHM);
 					flight_algorithm_update(&BME280_sensor, &BMI_sensor, &sensor_output);
-					PROFILE_END(PROF_FLIGHT_ALGORITHM);
+					//PROFILE_END(PROF_FLIGHT_ALGORITHM);
 					
 					// Package all sensor data into telemetry packet for ground station transmission
-					PROFILE_START(PROF_PACKET_COMPOSE);
+					//PROFILE_START(PROF_PACKET_COMPOSE);
 					addDataPacketNormal(&BME280_sensor, &BMI_sensor, &gnss_data, &sensor_output, voltage_V, current_mA);
-					PROFILE_END(PROF_PACKET_COMPOSE);
+					//PROFILE_END(PROF_PACKET_COMPOSE);
+
+
+					addDataPacketSD(&BME280_sensor, &BMI_sensor, &gnss_data, &sensor_output, voltage_V, current_mA);
+
 
 					//HAL_UART_Transmit(&huart1, (uint8_t*)normal_paket, 62, 100);
-					PROFILE_START(PROF_SD_LOGGER);
-					log_normal_packet_data(normal_paket);
-					PROFILE_END(PROF_SD_LOGGER);
+					//PROFILE_START(PROF_SD_LOGGER);
+					log_normal_packet_data(sd_paket);
+					//PROFILE_END(PROF_SD_LOGGER);
 
 					PROFILE_START(PROF_FLASH);
-					//W25Q_WriteToBufferFlushOnSectorFull(normal_paket);
+					W25Q_WriteToBufferFlushOnSectorFull(sd_paket);
 					PROFILE_END(PROF_FLASH);
 
-					HAL_UART_Transmit(&huart1, (uint8_t*)normal_paket, 62, 100);
+					//HAL_UART_Transmit(&huart1, (uint8_t*)normal_paket, 62, 100);
 
-					//dwt_profiler_print_compact();
+					dwt_profiler_print_compact();
 
 					/* Optional real-time telemetry transmission (disabled to reduce latency) */
 					//uint16_t status_bits = flight_algorithm_get_status_bits();
@@ -417,13 +430,9 @@ int main(void)
 		}
 		if(tx_timer_flag_1s >= 10){
 			tx_timer_flag_1s = 0;
-			read_ADC();
 			lora_send_packet_dma((uint8_t*)normal_paket, 62);
 		}
-		if(tx_timer_flag_20s >= 200){
-			tx_timer_flag_20s = 0;
-	        HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_6);
-		}
+
 	}
   /* USER CODE END 3 */
 }
@@ -741,7 +750,7 @@ static void MX_TIM2_Init(void)
 
   /* USER CODE END TIM2_Init 1 */
   htim2.Instance = TIM2;
-  htim2.Init.Prescaler = 8999;
+  htim2.Init.Prescaler = 8399;
   htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim2.Init.Period = 999;
   htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
@@ -946,16 +955,17 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOD_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, RF_M0_Pin|RF_M1_Pin|SD_CS_Pin|GPIO_PIN_11, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(CAMERA_GPIO_Port, CAMERA_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, SGU_LED2_Pin|SGU_LED1_Pin|W25_FLASH_CS_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, RF_M0_Pin|RF_M1_Pin|SD_CS_Pin|KURTARMA2_Pin
+                          |BUZZER_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(GPIOB, SGU_LED2_Pin|SGU_LED1_Pin|W25_FLASH_CS_Pin|GPIO_PIN_14, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6|MCU_LED_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOC, KURTARMA1_Pin|MCU_LED_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pins : STATUS1_Pin STATUS2_Pin */
   GPIO_InitStruct.Pin = STATUS1_Pin|STATUS2_Pin;
@@ -963,8 +973,15 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : RF_M0_Pin RF_M1_Pin PA11 */
-  GPIO_InitStruct.Pin = RF_M0_Pin|RF_M1_Pin|GPIO_PIN_11;
+  /*Configure GPIO pins : CAMERA_Pin KURTARMA1_Pin MCU_LED_Pin */
+  GPIO_InitStruct.Pin = CAMERA_Pin|KURTARMA1_Pin|MCU_LED_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : RF_M0_Pin RF_M1_Pin KURTARMA2_Pin BUZZER_Pin */
+  GPIO_InitStruct.Pin = RF_M0_Pin|RF_M1_Pin|KURTARMA2_Pin|BUZZER_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -996,13 +1013,6 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-
-  /*Configure GPIO pins : PC6 MCU_LED_Pin */
-  GPIO_InitStruct.Pin = GPIO_PIN_6|MCU_LED_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
   /*Configure GPIO pin : PA12 */
   GPIO_InitStruct.Pin = GPIO_PIN_12;
@@ -1082,7 +1092,7 @@ void lora_init(void)
 	lora_1.lbt				=	E22_LBT_DISABLE;
 	lora_1.wor				=	E22_WOR_RECEIVER;
 	lora_1.wor_cycle		=	E22_WOR_CYCLE_1000;
-	lora_1.channel			=	25;
+	lora_1.channel			=	23;
 
 	e22_init(&lora_1, &huart2);
 

@@ -36,6 +36,8 @@ unsigned char check_sum_hesapla_sit(int a);
 
 void addDataPacketNormal(BME_280_t* BME, bmi088_struct_t* BMI, gps_data_t* GPS, sensor_fusion_t* sensor_fusion ,float voltage, float current);
 void addDataPacketSit(BME_280_t* BME, bmi088_struct_t* BMI);
+void addDataPacketSD(BME_280_t* BME, bmi088_struct_t* BMI, gps_data_t* GPS, sensor_fusion_t* sensor_fusion ,float voltage, float current);
+
 
 float uint8_arrayi_float32_ye_donustur(uint8_t byte_array_u8[4]);
 void verileri_coz(uint8_t gelen_paket[36]);

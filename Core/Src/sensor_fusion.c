@@ -11,6 +11,11 @@
 #include "flight_algorithm.h"
 #include <math.h>
 
+// M_PI tanımı yoksa tanımla
+#ifndef M_PI
+#define M_PI 3.14159265358979323846f
+#endif
+
 /* Private variables */
 static KalmanFilter_t kalman;          // Kalman filter instance from kalman.h
 static uint8_t initialized = 0;        // Flag to track initialization
@@ -121,13 +126,12 @@ static uint8_t detect_accel_failure(float accel)
  */
 void sensor_fusion_init()
 {
+    // Sensörlerinize göre gürültü değerlerini ayarlayın - daha konservatif başlangıç
+    kalman.process_noise = 0.05f;         // Model gürültüsü (biraz artırıldı)
+    kalman.measurement_noise_alt = 0.1f;  // BME280 yükseklik gürültüsü (daha realistik)
+    kalman.measurement_noise_acc = 10.0f; // BMI088 ivme gürültüsü (başlangıç için)
+    
     KalmanFilter_Init(&kalman);
-
-    // Sensörlerinize göre gürültü değerlerini ayarlayın
-    kalman.process_noise = 0.1f;         // Model gürültüsü
-    kalman.measurement_noise_alt = 0.005f;  // BME280 yükseklik gürültüsü
-    kalman.measurement_noise_acc = 50.0f;  // BMI088 ivme gürültüsü
-
 
     // İvme arıza tespit değişkenlerini sıfırla
     for (int i = 0; i < ACCEL_BUFFER_SIZE; i++) {
@@ -138,7 +142,7 @@ void sensor_fusion_init()
     accel_failure_detected = 0;
 
     initialized = 1;
-    last_kalman_update_time = HAL_GetTick();
+    last_kalman_update_time = 0;  // Sıfırla ki ilk çalıştırmada düzgün başlasın
     flight_start_time = 0;
 }
 
@@ -151,21 +155,36 @@ void sensor_fusion_update_kalman(BME_280_t* BME, bmi088_struct_t* BMI, sensor_fu
     uint32_t current_time = HAL_GetTick();
 
     // Calculate time difference in seconds
-    float time_sec = (current_time - last_kalman_update_time) / 1000.0f;
+    float time_sec;
+    
+    // İlk çalıştırmada zamanı başlat
+    if (last_kalman_update_time == 0) {
+        last_kalman_update_time = current_time;
+        time_sec = 0.01f; // İlk iterasyon için sabit değer
+    } else {
+        // Zaman farkını hesapla
+        uint32_t time_diff = current_time - last_kalman_update_time;
+        time_sec = time_diff / 1000.0f;
+        
+        // Zaman kontrolü - makul sınırlar içinde olmalı
+        if (time_sec <= 0.0f || time_sec > 1.0f) {
+            time_sec = 0.01f; // Default 10ms if invalid
+        }
+    }
 
     // Update the last update time
     last_kalman_update_time = current_time;
 
-    // Ensure time is valid (never zero or negative)
-    if (time_sec <= 0.001f) {
-        time_sec = 0.01f; // Use default time step if invalid
+    // Güvenlik kontrolü - BME ve BMI sensör verilerinin geçerli olduğundan emin ol
+    if (BME == NULL || BMI == NULL || sensor == NULL) {
+        return;
     }
 
     // Calculate vertical acceleration by compensating for gravity using IMU orientation
     float angle_rad = BMI->datas.theta * (M_PI / 180.0f);  // dereceyse radyana çevir
 
     // Yerçekimi ivmesinin lokal z eksenindeki bileşeni
-    float g_local_z = 9.81f * cos(angle_rad);
+    float g_local_z = 9.81f * cosf(angle_rad);
 
     // Gerçek ivmeyi hesapla:
     float accel_z_corrected = BMI->datas.acc_z - g_local_z;
@@ -173,10 +192,15 @@ void sensor_fusion_update_kalman(BME_280_t* BME, bmi088_struct_t* BMI, sensor_fu
     // İvme sensörü arıza tespiti
     accel_failure_detected = detect_accel_failure(accel_z_corrected);
 
+    // İvme değeri kontrolü - aşırı değerleri sınırla
+    if (fabsf(accel_z_corrected) > 500.0f) {
+        accel_z_corrected = (accel_z_corrected > 0) ? 500.0f : -500.0f;
+    }
+
     // Arıza durumuna göre Kalman filtresi parametrelerini güncelle
     if (accel_failure_detected) {
         // Arıza tespit edildi - ivme sensörüne çok az güven
-        kalman.measurement_noise_acc = 50.0f;
+        kalman.measurement_noise_acc = 500.0f;  // Çok yüksek gürültü = düşük güven
     } else {
         // Normal durum - normal güven
         kalman.measurement_noise_acc = 50.0f;
@@ -184,7 +208,7 @@ void sensor_fusion_update_kalman(BME_280_t* BME, bmi088_struct_t* BMI, sensor_fu
 
     // Only update if initialized
     if (initialized) {
-        sensor->filtered_altitude = KalmanFilter_Update(&kalman, BME->altitude, -1000, time_sec);
+        sensor->filtered_altitude = KalmanFilter_Update(&kalman, BME->altitude, accel_z_corrected, time_sec);
         sensor->apogeeDetect = KalmanFilter_IsApogeeDetected(&kalman);
         sensor->velocity = Kalman_Get_Velocity(&kalman);
         sensor->accel_failure = accel_failure_detected;

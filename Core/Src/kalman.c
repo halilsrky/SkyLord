@@ -18,17 +18,22 @@ static int KalmanFilter_DetectApogee(KalmanFilter_t *kf);
  * @param kf Pointer to Kalman filter structure
  */
 void KalmanFilter_Init(KalmanFilter_t *kf) {
-    // Initialize state vector
-    kf->x[0] = 0.0f;  // Altitude
-    kf->x[1] = 0.0f;  // Velocity
-    kf->x[2] = 0.0f;  // Acceleration
+    // Initialize state vector - başlangıçta güvenli değerler
+    kf->x[0] = 0.0f;  // Altitude - başlangıç irtifa
+    kf->x[1] = 0.0f;  // Velocity - başlangıçta hız sıfır
+    kf->x[2] = 0.0f;  // Acceleration - başlangıçta ivme sıfır
 
-    // Initialize covariance matrix with initial uncertainty
+    // Initialize covariance matrix with reasonable initial uncertainty
     for (int i = 0; i < 3; i++) {
         for (int j = 0; j < 3; j++) {
-            kf->P[i][j] = (i == j) ? 100.0f : 0.0f;
+            kf->P[i][j] = 0.0f;
         }
     }
+    
+    // Başlangıç belirsizlikleri - daha konservatif değerler
+    kf->P[0][0] = 1.0f;     // Altitude uncertainty (1 meter)
+    kf->P[1][1] = 0.1f;     // Velocity uncertainty (0.1 m/s) 
+    kf->P[2][2] = 1.0f;     // Acceleration uncertainty (1 m/s²)
 
     // Set noise parameters - these can be tuned
     kf->process_noise = 0.01f;         // Process noise

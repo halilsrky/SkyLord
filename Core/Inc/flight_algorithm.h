@@ -21,8 +21,6 @@
 #define BIT_DESCENT_STARTED       0x0010  // Descent detected for drogue deployment
 #define BIT_BELOW_MAIN_ALTITUDE   0x0020  // Below main parachute deployment altitude
 #define BIT_LANDED                0x0040  // Rocket landed (not currently used)
-#define BIT_SENSOR_ERROR          0x0080  // Sensor error detected
-#define BIT_DROGUE_DEPLOYED       0x0100  // Drogue parachute deployed
 #define BIT_MAIN_DEPLOYED         0x0200  // Main parachute deployed
 
 // Flight phases

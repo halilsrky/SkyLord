@@ -105,16 +105,35 @@ void bme280_config()
     data_ctrl = (BME->device_config.bme280_standby_time << 5) | (BME->device_config.bme280_filter << 2);
     retVal = HAL_I2C_Mem_Write(I2C_, BME280_ADD, BME280_CONFIG, I2C_MEMADD_SIZE_8BIT, &data_ctrl, 1, 50);
 
-    // Take base altitude readings
-    float base = 0.0;
     HAL_Delay(100);
 
-    for(int i = 0; i < 50; i++) {
+    // Base altitude hesaplaması - daha güvenilir
+    int valid_readings = 0;
+    float readings_sum = 0.0f;
+    
+    for(int i = 0; i < 100; i++) {  // Daha fazla okuma
         bme280_update();
-        base += BME->altitude;
-        HAL_Delay(30);
+        
+        // Geçerli basınç okuması kontrolü
+        if (BME->pressure > 300.0f && BME->pressure < 1200.0f) {  // Makul basınç aralığı
+            float temp_altitude = 44330.0 * (1.0 - pow((BME->pressure / 1013.25), (1.0 / 5.255)));
+            
+            // Aşırı değerleri filtrele
+            if (temp_altitude > -1000.0f && temp_altitude < 10000.0f) {
+                readings_sum += temp_altitude;
+                valid_readings++;
+            }
+        }
+        HAL_Delay(20);  // Kısa bekleme
     }
-    BME->base_altitude = (base / 50.0);
+    
+    // Yeterli geçerli okuma varsa ortalama al
+    if (valid_readings > 50) {
+        BME->base_altitude = readings_sum / valid_readings;
+    } else {
+        BME->base_altitude = 0.0f;  // Güvenli varsayılan değer
+    }
+    
     bme280_update();
 
     UNUSED(retVal);
