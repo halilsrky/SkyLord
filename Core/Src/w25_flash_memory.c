@@ -22,9 +22,6 @@ static uint8_t page_write_started = 0;
 static uint8_t w25q_counter = 0;
 static uint8_t sector_finished = 0;
 static uint8_t write_enable = 0;
-static uint8_t last_status = 0;
-static uint32_t last_status_check = 0;
-#define STATUS_CHECK_INTERVAL 5  // ms
 
 static void CS_Low(void);
 static void CS_High(void);
@@ -32,10 +29,8 @@ static void Write_Enable(void);
 static void Write_Disable(void);
 static uint16_t Bytes_to_Write(uint32_t remaining_bytes_, uint8_t offset_);
 static void Add_to_Buffer(uint8_t *data);
-static uint8_t Get_Status_Cached(void);
 static void W25Q_EraseSector_NonBlocking(uint16_t sector);
 static void W25Q_WritePage_NonBlocking(uint16_t page, uint8_t offset, uint32_t size, uint8_t *txBuffer);
-static void W25Q_Write_NonBlocking(uint16_t page, uint8_t offset, uint32_t size, uint8_t *txBuffer);
 
 void W25Q_Init(SPI_HandleTypeDef *w25q_spi)
 {
@@ -215,6 +210,7 @@ void W25Q_WriteToBufferFlushOnSectorFull(uint8_t *data)
 
 	static uint8_t counter_ = 0;
 
+	// Write işlemi tamamlandı mı?
 	if(page_write_started == 1 && (status & WIP_BUSY) == 0)
 	{
 		page_write_started = 0;
@@ -257,21 +253,6 @@ uint8_t Read_Status_Register_1(void)
 	CS_High();
 
 	return response;
-}
-
-// Cached status okuma - performans için
-static uint8_t Get_Status_Cached(void)
-{
-	uint32_t current_time = HAL_GetTick();
-
-	// Sadece belirli aralıklarla status register'ı oku
-	if((current_time - last_status_check) >= STATUS_CHECK_INTERVAL)
-	{
-		last_status = Read_Status_Register_1();
-		last_status_check = current_time;
-	}
-
-	return last_status;
 }
 
 // ULTRA FAST: Non-blocking sector erase
@@ -319,48 +300,6 @@ static void W25Q_WritePage_NonBlocking(uint16_t page, uint8_t offset, uint32_t s
 		CS_High();
 	}
 	//Write_Disable();
-}
-
-// ULTRA FAST: Non-blocking write
-static void W25Q_Write_NonBlocking(uint16_t page, uint8_t offset, uint32_t size, uint8_t *txBuffer)
-{
-	uint8_t data[260];
-	uint32_t txBuffer_index = 0;
-	uint16_t pages_to_write = (size + 255) / 256;  // Ceil division
-
-	// Hızlı write enable
-	uint8_t we_cmd = 0x06;
-	CS_Low();
-	HAL_SPI_Transmit(W25Q_SPI, &we_cmd, 1, 100);
-	CS_High();
-
-	// Burst write: Tüm sayfaları ardarda yaz
-	for(uint16_t i = 0; i < pages_to_write && txBuffer_index < size; i++)
-	{
-		uint32_t memAddress = ((page + i) * 256) + ((i == 0) ? offset : 0);
-		uint16_t bytes_in_page = (size - txBuffer_index > 256) ? 256 : (size - txBuffer_index);
-
-		// Page program command
-		data[0] = 0x02;
-		data[1] = (memAddress >> 16) & 0xFF;
-		data[2] = (memAddress >> 8) & 0xFF;
-		data[3] = memAddress & 0xFF;
-
-		// Data kopyala
-		memcpy(&data[4], &txBuffer[txBuffer_index], bytes_in_page);
-
-		// Hızlı SPI transfer
-		CS_Low();
-		HAL_SPI_Transmit(W25Q_SPI, data, bytes_in_page + 4, 500);
-		CS_High();
-
-		txBuffer_index += bytes_in_page;
-
-		// Micro delay sadece gerekirse
-		if(i < pages_to_write - 1) {
-			for(volatile int d = 0; d < 100; d++);  // ~10μs
-		}
-	}
 }
 
 static void CS_Low(void)
@@ -411,10 +350,18 @@ static void Add_to_Buffer(uint8_t *data_)
 	{
 		uint16_t startIndex = w25q_counter * 64;
 		memcpy(&w25q_txBuffer_1[startIndex], data_, 64);
+		/*
+		w25q_txBuffer_1[startIndex + 62] = 0x00;
+		w25q_txBuffer_1[startIndex + 63] = 0x00;
+		*/
 	}
 	else if(current_buffer == 2)
 	{
 		uint16_t startIndex = w25q_counter * 64;
 		memcpy(&w25q_txBuffer_2[startIndex], data_, 64);
+		/*
+		w25q_txBuffer_2[startIndex + 62] = 0xFF;
+		w25q_txBuffer_2[startIndex + 63] = 0xFF;
+		*/
 	}
 }

@@ -76,6 +76,17 @@ void flight_algorithm_set_parameters(float launch_accel_threshold,
                                     float main_chute_altitude,
                                     float max_angle_threshold);
 
+/**
+ * @brief Restore flight algorithm state from backup data
+ * @param phase Flight phase to restore
+ * @param status_bits Status bits to restore
+ * @param durum_verisi Durum verisi to restore
+ * @param flight_start_time Flight start time to restore
+ */
+void flight_algorithm_restore_state(FlightPhase_t phase, 
+                                  uint16_t status_bits, 
+                                  uint8_t durum_verisi, 
+                                  uint32_t flight_start_time);
 
 void deploy_drogue_parachute(void);
 void deploy_main_parachute(void);

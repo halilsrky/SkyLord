@@ -155,13 +155,13 @@ void flight_algorithm_update(BME_280_t* bme, bmi088_struct_t* bmi, sensor_fusion
             }
 
             // Check if angle exceeds threshold
-         /*   if (is_armed && (fabs(bmi->datas.theta) > max_angle_threshold) && deployed_angle) {
+            if (is_armed && (fabs(bmi->datas.theta) > max_angle_threshold) && deployed_angle) {
                 drogue_deployed = 1;
                 deployed_angle = 0;
                 status_bits |= 0x0008; // Set Bit 3: Rocket body angle exceeds threshold
                 durum_verisi = 5;
                 deploy_drogue_parachute();
-            }*/
+            }
 
             if (is_armed && sensor_fusion->velocity < 0.0f && sensor_fusion->velocity < prev_velocity && deployed_velocity) {
                 apogee_counter++;
@@ -280,5 +280,43 @@ void deploy_main_parachute(void)
         HAL_GPIO_WritePin(KURTARMA2_GPIO_Port, KURTARMA2_Pin, GPIO_PIN_SET);
         main_pulse_start_time = HAL_GetTick();
         main_pulse_active = 1;
+    }
+}
+
+/**
+ * @brief Restore flight algorithm state from backup data
+ * @param phase Flight phase to restore
+ * @param status_bits Status bits to restore
+ * @param durum_verisi Durum verisi to restore
+ * @param flight_start_time Flight start time to restore
+ */
+void flight_algorithm_restore_state(FlightPhase_t phase, 
+                                  uint16_t status_bits_restore, 
+                                  uint8_t durum_verisi_restore, 
+                                  uint32_t flight_start_time_restore)
+{
+    current_phase = phase;
+    status_bits = status_bits_restore;
+    durum_verisi = durum_verisi_restore;
+    flight_start_time = flight_start_time_restore;
+    
+    // Set appropriate flags based on status bits
+    if (status_bits & BIT_LAUNCH_DETECTED) {
+        is_rising = 1;
+    }
+    
+    if (status_bits & BIT_MIN_ALTITUDE_PASSED) {
+        is_armed = 1;
+    }
+    
+    if (status_bits & (BIT_HIGH_ANGLE_OR_ACCEL | BIT_DESCENT_STARTED)) {
+        drogue_deployed = 1;
+        deployed_angle = 0;
+        deployed_velocity = 0;
+    }
+    
+    if (status_bits & BIT_MAIN_DEPLOYED) {
+        main_deployed = 1;
+        drogue_deployed = 0;
     }
 }

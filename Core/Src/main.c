@@ -39,6 +39,7 @@
 #include "queternion.h"                // Quaternion math operations
 #include "sensor_fusion.h"             // Sensor fusion algorithms (Mahony, Kalman)
 #include "flight_algorithm.h"          // Flight state detection and control
+#include "reset_detect.h"
 
 /* Communication modules */
 #include "uart_handler.h"              // UART command processing
@@ -102,6 +103,8 @@ I2C_HandleTypeDef hi2c1;
 I2C_HandleTypeDef hi2c3;
 DMA_HandleTypeDef hdma_i2c3_rx;
 
+RTC_HandleTypeDef hrtc;
+
 SPI_HandleTypeDef hspi1;
 SPI_HandleTypeDef hspi2;
 
@@ -118,6 +121,15 @@ DMA_HandleTypeDef hdma_usart2_tx;
 
 /* USER CODE BEGIN PV */
 
+/* Backup SRAM data structure for BMI088 offsets */
+typedef struct bckp_sram_datas
+{
+	bmi088_offsets_t offsets;
+}bckp_sram_datas_t;
+
+/* Backup SRAM pointer - directly access backup SRAM memory */
+bckp_sram_datas_t* backup_datas = (bckp_sram_datas_t*) BACKUP_SRAM_BASE_ADDRESS;
+
 /* Structures */
 static BME_280_t BME280_sensor;         // BME280 barometric pressure sensor
 bmi088_struct_t BMI_sensor;             // BMI088 IMU sensor (accelerometer + gyroscope)
@@ -126,12 +138,16 @@ BME_parameters_t bme_params;             // BME280 calibration parameters
 gps_data_t gnss_data;                  // L86 GNSS receiver data
 static e22_conf_struct_t lora_1;
 
+
+RTC_TimeTypeDef sTime;
+RTC_DateTypeDef sDate;
+
+
 /* Communication buffers and structures */
 uint8_t usart4_rx_buffer[UART_RX_BUFFER_SIZE];  // UART4 receive buffer
 static char uart_buffer[UART_TX_BUFFER_SIZE];   // General purpose UART buffer for formatted strings
 extern unsigned char normal_paket[62];  // Normal mode telemetry packet
 extern unsigned char sd_paket[64];  // Normal mode telemetry packet
-uint8_t sector_buffer[4096];
 
 /* ADC buffers for voltage and current measurement */
 float current_mA = 0.0f;               // Processed current value in mA
@@ -175,6 +191,7 @@ static void MX_UART4_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_SPI2_Init(void);
+static void MX_RTC_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* Sensor initialization functions */
@@ -239,6 +256,7 @@ int main(void)
   MX_SPI1_Init();
   MX_FATFS_Init();
   MX_SPI2_Init();
+  MX_RTC_Init();
   /* USER CODE BEGIN 2 */
 	/* ==== TIMER AND INTERRUPT CONFIGURATION ==== */
 	// Configure Timer 2 for periodic operations (10ms interval)
@@ -253,20 +271,76 @@ int main(void)
 	// Enable external interrupts for IMU data ready signals
 	HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 
+	HAL_PWR_EnableBkUpAccess();
+	RCC->AHB1ENR |= RCC_AHB1ENR_BKPSRAMEN;
+	HAL_PWR_EnableBkUpReg();
+
+	// Initialize backup SRAM system
+	backup_sram_init();
+
 	/* ==== SENSOR INITIALIZATION ==== */
 	// Initialize BME280 barometric pressure sensor
 	bme280_begin();
-	HAL_Delay(1000);
-	bme280_config();
-	bme280_update();
-
-	// Initialize BMI088 IMU sensor (accelerometer + gyroscope)
+	// Initialize BMI088 with restored offsets
 	bmi_imu_init();
-	bmi088_config(&BMI_sensor);
-	get_offset(&BMI_sensor);
 
-	// Get initial quaternion for orientation
-	getInitialQuaternion();
+
+	HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
+	HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
+	HAL_Delay(5);
+
+	/* ==== RESET DETECTION AND DATA RESTORATION ==== */
+	uint8_t reset_occurred = is_reset_occurred(sTime, sDate);
+
+	
+	if (reset_occurred) {
+		
+		// Reset occurred - restore critical data from backup SRAM
+		restore_critical_data_from_backup_sram(&BME280_sensor, &BMI_sensor);
+
+		// Configure sensors with restored calibration data
+		HAL_Delay(100);
+		bme280_config();
+		bme280_update();
+		
+		bmi088_config(&BMI_sensor);
+		// Don't recalculate offsets - use restored ones from backup SRAM
+		getInitialQuaternion(); 	// Get initial quaternion for orientation
+
+		// Restore flight algorithm state (will overwrite initialized state)
+		restore_flight_data_from_backup_sram();
+
+		save_time(sTime, sDate); // Save current time for next reset detection
+			
+	} else {
+		// Normal startup - perform full calibration
+		save_time(sTime, sDate); // Save current time for next reset detection
+		
+		/* ==== SENSOR INITIALIZATION ==== */
+		// Initialize BME280 barometric pressure sensor
+		HAL_Delay(100);
+		bme280_config();
+		bme280_update();
+		
+		bmi088_config(&BMI_sensor);
+		get_offset(&BMI_sensor); // Calculate fresh offset data
+		getInitialQuaternion(); 	// Get initial quaternion for orientation
+
+	    HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin, SET);
+	    HAL_Delay(300);
+	    HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin, RESET);
+
+		// Save static calibration data to backup SRAM (only once at startup)
+		save_static_calibration_data(&BME280_sensor, &BMI_sensor);
+	}
+
+	/* ==== SENSOR FUSION AND ALGORITHMS ==== */
+	// Initialize sensor fusion system
+	sensor_fusion_init();
+
+	// Configure and initialize flight algorithm BEFORE restore (so it can be overwritten)
+	flight_algorithm_set_parameters(FLIGHT_ACCEL_THRESHOLD, FLIGHT_MAX_ALTITUDE, FLIGHT_MIN_ALTITUDE, FLIGHT_MAX_VELOCITY);
+	flight_algorithm_init();
 
 	/* ==== LORA COMMUNICATION SETUP ==== */
     e22_config_mode(&lora_1);
@@ -274,14 +348,6 @@ int main(void)
 	lora_init();
     HAL_Delay(20);
 	e22_transmit_mode(&lora_1);
-
-	/* ==== SENSOR FUSION AND ALGORITHMS ==== */
-	// Initialize sensor fusion system
-	sensor_fusion_init();
-	
-	// Configure flight algorithm parameters (accel_threshold, max_altitude, min_altitude, max_velocity)
-	flight_algorithm_set_parameters(FLIGHT_ACCEL_THRESHOLD, FLIGHT_MAX_ALTITUDE, FLIGHT_MIN_ALTITUDE, FLIGHT_MAX_VELOCITY);
-	flight_algorithm_init();
 
 	/* ==== UART AND COMMUNICATION SETUP ==== */
 	// Initialize UART handler for command processing
@@ -306,9 +372,6 @@ int main(void)
 
 	HAL_GPIO_WritePin(CAMERA_GPIO_Port, CAMERA_Pin, SET);
     HAL_Delay(30);
-    HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin, SET);
-    HAL_Delay(300);
-    HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin, RESET);
 
   /* USER CODE END 2 */
 
@@ -357,6 +420,33 @@ int main(void)
 			//L86_GNSS_Print_Info(&gnss_data, &huart1);
 			//PROFILE_END(PROF_GNSS_UPDATE);
 
+			// Update current time for reset detection
+			HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
+			HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
+			
+			save_time(sTime, sDate);
+
+			// DEBUG: Print current and saved time for reset detection debugging
+		/*	uint32_t current_seconds = sTime.Hours * 3600 + sTime.Minutes * 60 + sTime.Seconds + sDate.Date * 86400;
+			HAL_PWR_EnableBkUpAccess();
+			uint32_t saved_seconds = HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR2);
+			uint32_t time_difference = measure_abs_time(sTime, sDate);
+			
+			sprintf(uart_buffer, "DEBUG: Current=%lu Saved=%lu Diff=%lu Reset=%d\r\n", 
+					current_seconds, saved_seconds, time_difference, is_reset_occurred(sTime, sDate));
+			HAL_UART_Transmit(&huart1, (uint8_t*)uart_buffer, strlen(uart_buffer), 100);
+
+			// Read backup SRAM data
+			backup_sram_data_t* backup_data = (backup_sram_data_t*)BACKUP_SRAM_DATA_ADDRESS;
+			
+			HAL_UART_Transmit(&huart1, (uint8_t*)uart_buffer, strlen(uart_buffer), 100);
+			
+			sprintf(uart_buffer, "SRAM Magic: 0x%08lX Timestamp: %lu BaseAlt: %.6f\r\n",
+					backup_data->magic_number,
+					backup_data->last_save_timestamp,
+					backup_data->bmi_offsets.gyro_offset[1]);
+			HAL_UART_Transmit(&huart1, (uint8_t*)uart_buffer, strlen(uart_buffer), 100);*/
+			
 
 			// Check high-speed data acquisition status
 			HSD_StatusCheck();
@@ -394,18 +484,20 @@ int main(void)
 					addDataPacketSD(&BME280_sensor, &BMI_sensor, &gnss_data, &sensor_output, voltage_V, current_mA);
 
 
-					//HAL_UART_Transmit(&huart1, (uint8_t*)normal_paket, 62, 100);
+					HAL_UART_Transmit(&huart1, (uint8_t*)normal_paket, 62, 100);
+
+
 					//PROFILE_START(PROF_SD_LOGGER);
 					log_normal_packet_data(sd_paket);
 					//PROFILE_END(PROF_SD_LOGGER);
 
-					PROFILE_START(PROF_FLASH);
+					//PROFILE_START(PROF_FLASH);
 					W25Q_WriteToBufferFlushOnSectorFull(sd_paket);
-					PROFILE_END(PROF_FLASH);
+					//PROFILE_END(PROF_FLASH);
 
 					//HAL_UART_Transmit(&huart1, (uint8_t*)normal_paket, 62, 100);
 
-					dwt_profiler_print_compact();
+					//dwt_profiler_print_compact();
 
 					/* Optional real-time telemetry transmission (disabled to reduce latency) */
 					//uint16_t status_bits = flight_algorithm_get_status_bits();
@@ -426,11 +518,17 @@ int main(void)
 					/* Unknown mode - Log error or switch to safe mode */
 					// TODO: Add error handling for unknown system modes
 					break;
+
 			}
 		}
 		if(tx_timer_flag_1s >= 10){
 			tx_timer_flag_1s = 0;
 			lora_send_packet_dma((uint8_t*)normal_paket, 62);
+			
+			// Save only dynamic flight data to backup SRAM every 10 seconds
+			save_flight_data_to_backup_sram();
+			
+
 		}
 
 	}
@@ -454,8 +552,9 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE|RCC_OSCILLATORTYPE_LSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+  RCC_OscInitStruct.LSEState = RCC_LSE_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
   RCC_OscInitStruct.PLL.PLLM = 8;
@@ -652,6 +751,41 @@ static void MX_I2C3_Init(void)
   /* USER CODE BEGIN I2C3_Init 2 */
 
   /* USER CODE END I2C3_Init 2 */
+
+}
+
+/**
+  * @brief RTC Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_RTC_Init(void)
+{
+
+  /* USER CODE BEGIN RTC_Init 0 */
+
+  /* USER CODE END RTC_Init 0 */
+
+  /* USER CODE BEGIN RTC_Init 1 */
+
+  /* USER CODE END RTC_Init 1 */
+
+  /** Initialize RTC Only
+  */
+  hrtc.Instance = RTC;
+  hrtc.Init.HourFormat = RTC_HOURFORMAT_24;
+  hrtc.Init.AsynchPrediv = 127;
+  hrtc.Init.SynchPrediv = 255;
+  hrtc.Init.OutPut = RTC_OUTPUT_DISABLE;
+  hrtc.Init.OutPutPolarity = RTC_OUTPUT_POLARITY_HIGH;
+  hrtc.Init.OutPutType = RTC_OUTPUT_TYPE_OPENDRAIN;
+  if (HAL_RTC_Init(&hrtc) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN RTC_Init 2 */
+
+  /* USER CODE END RTC_Init 2 */
 
 }
 
@@ -962,7 +1096,10 @@ static void MX_GPIO_Init(void)
                           |BUZZER_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, SGU_LED2_Pin|SGU_LED1_Pin|W25_FLASH_CS_Pin|GPIO_PIN_14, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, SGU_LED2_Pin|SGU_LED1_Pin|W25_FLASH_CS_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOC, KURTARMA1_Pin|MCU_LED_Pin, GPIO_PIN_RESET);
@@ -1069,7 +1206,7 @@ uint8_t bmi_imu_init(void)
 	BMI_sensor.device_config.acc_IRQ = EXTI15_10_IRQn;
 	BMI_sensor.device_config.gyro_IRQ = EXTI15_10_IRQn;
 	BMI_sensor.device_config.BMI_I2c = &IMU_I2C_HNDLR;
-	BMI_sensor.device_config.offsets = NULL;  // Offset data stored in backup SRAM
+	BMI_sensor.device_config.offsets = &backup_datas->offsets;	// Offset data stored in backup SRAM for saving them from unwanted reset
 
 	return bmi088_init(&BMI_sensor);
 }
@@ -1300,7 +1437,6 @@ void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c)
         }
     }
 }
-
 /* USER CODE END 4 */
 
 /**

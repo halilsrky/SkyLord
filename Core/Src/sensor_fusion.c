@@ -128,8 +128,8 @@ void sensor_fusion_init()
 {
     // Sensörlerinize göre gürültü değerlerini ayarlayın - daha konservatif başlangıç
     kalman.process_noise = 0.05f;         // Model gürültüsü (biraz artırıldı)
-    kalman.measurement_noise_alt = 0.1f;  // BME280 yükseklik gürültüsü (daha realistik)
-    kalman.measurement_noise_acc = 10.0f; // BMI088 ivme gürültüsü (başlangıç için)
+    kalman.measurement_noise_alt = 3.1f;  // BME280 yükseklik gürültüsü (daha realistik)
+    kalman.measurement_noise_acc = 0.05f; // BMI088 ivme gürültüsü (başlangıç için)
     
     KalmanFilter_Init(&kalman);
 
@@ -200,10 +200,10 @@ void sensor_fusion_update_kalman(BME_280_t* BME, bmi088_struct_t* BMI, sensor_fu
     // Arıza durumuna göre Kalman filtresi parametrelerini güncelle
     if (accel_failure_detected) {
         // Arıza tespit edildi - ivme sensörüne çok az güven
-        kalman.measurement_noise_acc = 500.0f;  // Çok yüksek gürültü = düşük güven
+        kalman.measurement_noise_acc = 5000.5f;  // Çok yüksek gürültü = düşük güven
     } else {
         // Normal durum - normal güven
-        kalman.measurement_noise_acc = 50.0f;
+        kalman.measurement_noise_acc = 0.05f;
     }
 
     // Only update if initialized
