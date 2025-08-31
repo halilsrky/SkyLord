@@ -121,15 +121,6 @@ DMA_HandleTypeDef hdma_usart2_tx;
 
 /* USER CODE BEGIN PV */
 
-/* Backup SRAM data structure for BMI088 offsets */
-typedef struct bckp_sram_datas
-{
-	bmi088_offsets_t offsets;
-}bckp_sram_datas_t;
-
-/* Backup SRAM pointer - directly access backup SRAM memory */
-bckp_sram_datas_t* backup_datas = (bckp_sram_datas_t*) BACKUP_SRAM_BASE_ADDRESS;
-
 /* Structures */
 static BME_280_t BME280_sensor;         // BME280 barometric pressure sensor
 bmi088_struct_t BMI_sensor;             // BMI088 IMU sensor (accelerometer + gyroscope)
@@ -278,11 +269,7 @@ int main(void)
 	// Initialize backup SRAM system
 	backup_sram_init();
 
-	/* ==== SENSOR INITIALIZATION ==== */
-	// Initialize BME280 barometric pressure sensor
-	bme280_begin();
-	// Initialize BMI088 with restored offsets
-	bmi_imu_init();
+
 
 
 	HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
@@ -295,43 +282,52 @@ int main(void)
 	
 	if (reset_occurred) {
 		
+		// Initialize BME280 barometric pressure sensor
+		bme280_begin();
+		// Initialize BMI088 with restored offsets
+		bmi_imu_init();
 		// Reset occurred - restore critical data from backup SRAM
 		restore_critical_data_from_backup_sram(&BME280_sensor, &BMI_sensor);
 
 		// Configure sensors with restored calibration data
-		HAL_Delay(100);
 		bme280_config();
-		bme280_update();
-		
 		bmi088_config(&BMI_sensor);
-		// Don't recalculate offsets - use restored ones from backup SRAM
-		getInitialQuaternion(); 	// Get initial quaternion for orientation
 
 		// Restore flight algorithm state (will overwrite initialized state)
 		restore_flight_data_from_backup_sram();
 
 		save_time(sTime, sDate); // Save current time for next reset detection
-			
+		HAL_Delay(10);
+		bmi088_update(&BMI_sensor);
+		HAL_Delay(10);
+		bme280_update();
+		HAL_Delay(10);
 	} else {
 		// Normal startup - perform full calibration
 		save_time(sTime, sDate); // Save current time for next reset detection
 		
 		/* ==== SENSOR INITIALIZATION ==== */
-		// Initialize BME280 barometric pressure sensor
-		HAL_Delay(100);
+		// Initialize BME280 sensor (temperature, humidity, pressure)
+		bme280_begin();
+		HAL_Delay(1000);
 		bme280_config();
 		bme280_update();
-		
+		setBase();
+
+		// Initialize BMI088 IMU (accelerometer and gyroscope)
+		bmi_imu_init();
 		bmi088_config(&BMI_sensor);
-		get_offset(&BMI_sensor); // Calculate fresh offset data
+		get_offset(&BMI_sensor);
 		getInitialQuaternion(); 	// Get initial quaternion for orientation
 
 	    HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin, SET);
 	    HAL_Delay(300);
 	    HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin, RESET);
+		setBase();
 
 		// Save static calibration data to backup SRAM (only once at startup)
 		save_static_calibration_data(&BME280_sensor, &BMI_sensor);
+
 	}
 
 	/* ==== SENSOR FUSION AND ALGORITHMS ==== */
@@ -372,6 +368,10 @@ int main(void)
 
 	HAL_GPIO_WritePin(CAMERA_GPIO_Port, CAMERA_Pin, SET);
     HAL_Delay(30);
+	HAL_GPIO_WritePin(CAMERA1_GPIO_Port, CAMERA1_Pin, SET);
+    HAL_Delay(30);
+
+    baf_init(&filter_1, 0, 0.3, 0.2, (float)HAL_GetTick());
 
   /* USER CODE END 2 */
 
@@ -427,7 +427,7 @@ int main(void)
 			save_time(sTime, sDate);
 
 			// DEBUG: Print current and saved time for reset detection debugging
-		/*	uint32_t current_seconds = sTime.Hours * 3600 + sTime.Minutes * 60 + sTime.Seconds + sDate.Date * 86400;
+	/*		uint32_t current_seconds = sTime.Hours * 3600 + sTime.Minutes * 60 + sTime.Seconds + sDate.Date * 86400;
 			HAL_PWR_EnableBkUpAccess();
 			uint32_t saved_seconds = HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR2);
 			uint32_t time_difference = measure_abs_time(sTime, sDate);
@@ -484,11 +484,11 @@ int main(void)
 					addDataPacketSD(&BME280_sensor, &BMI_sensor, &gnss_data, &sensor_output, voltage_V, current_mA);
 
 
-					HAL_UART_Transmit(&huart1, (uint8_t*)normal_paket, 62, 100);
+					//HAL_UART_Transmit(&huart1, (uint8_t*)normal_paket, 62, 100);
 
 
 					//PROFILE_START(PROF_SD_LOGGER);
-					log_normal_packet_data(sd_paket);
+					log_normal_packet_data(sd_paket, "skylord.bin");
 					//PROFILE_END(PROF_SD_LOGGER);
 
 					//PROFILE_START(PROF_FLASH);
@@ -1089,7 +1089,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOD_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(CAMERA_GPIO_Port, CAMERA_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(GPIOC, CAMERA_Pin|CAMERA1_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOA, RF_M0_Pin|RF_M1_Pin|SD_CS_Pin|KURTARMA2_Pin
@@ -1110,8 +1110,8 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : CAMERA_Pin KURTARMA1_Pin MCU_LED_Pin */
-  GPIO_InitStruct.Pin = CAMERA_Pin|KURTARMA1_Pin|MCU_LED_Pin;
+  /*Configure GPIO pins : CAMERA_Pin CAMERA1_Pin KURTARMA1_Pin MCU_LED_Pin */
+  GPIO_InitStruct.Pin = CAMERA_Pin|CAMERA1_Pin|KURTARMA1_Pin|MCU_LED_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -1206,7 +1206,7 @@ uint8_t bmi_imu_init(void)
 	BMI_sensor.device_config.acc_IRQ = EXTI15_10_IRQn;
 	BMI_sensor.device_config.gyro_IRQ = EXTI15_10_IRQn;
 	BMI_sensor.device_config.BMI_I2c = &IMU_I2C_HNDLR;
-	BMI_sensor.device_config.offsets = &backup_datas->offsets;	// Offset data stored in backup SRAM for saving them from unwanted reset
+	BMI_sensor.device_config.offsets = NULL;	// Offset data stored in backup SRAM for saving them from unwanted reset
 
 	return bmi088_init(&BMI_sensor);
 }

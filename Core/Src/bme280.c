@@ -63,7 +63,8 @@ void bme280_config()
     uint8_t params[25];
     HAL_StatusTypeDef retVal;
 
-    BME->base_altitude = 0.0;
+    // Note: base_altitude is not reset here to preserve restored values from backup SRAM
+    // It will be set properly during setBase() for normal startup or restored from backup
 
     // Reset and initialize I2C
     HAL_I2C_DeInit(I2C_);
@@ -105,39 +106,25 @@ void bme280_config()
     data_ctrl = (BME->device_config.bme280_standby_time << 5) | (BME->device_config.bme280_filter << 2);
     retVal = HAL_I2C_Mem_Write(I2C_, BME280_ADD, BME280_CONFIG, I2C_MEMADD_SIZE_8BIT, &data_ctrl, 1, 50);
 
-    HAL_Delay(100);
-
-    // Base altitude hesaplaması - daha güvenilir
-    int valid_readings = 0;
-    float readings_sum = 0.0f;
-    
-    for(int i = 0; i < 100; i++) {  // Daha fazla okuma
-        bme280_update();
-        
-        // Geçerli basınç okuması kontrolü
-        if (BME->pressure > 300.0f && BME->pressure < 1200.0f) {  // Makul basınç aralığı
-            float temp_altitude = 44330.0 * (1.0 - pow((BME->pressure / 1013.25), (1.0 / 5.255)));
-            
-            // Aşırı değerleri filtrele
-            if (temp_altitude > -1000.0f && temp_altitude < 10000.0f) {
-                readings_sum += temp_altitude;
-                valid_readings++;
-            }
-        }
-        HAL_Delay(20);  // Kısa bekleme
-    }
-    
-    // Yeterli geçerli okuma varsa ortalama al
-    if (valid_readings > 50) {
-        BME->base_altitude = readings_sum / valid_readings;
-    } else {
-        BME->base_altitude = 0.0f;  // Güvenli varsayılan değer
-    }
-    
     bme280_update();
-
     UNUSED(retVal);
 }
+
+void setBase(){
+
+	float base = 0.0;
+	BME->base_altitude = 0.0;
+
+	for(int i = 0; i < 30; i++)		//Taking base altitude
+	{
+	  bme280_update();
+	  base +=  BME->altitude;
+	  HAL_Delay(30);
+	}
+
+	BME->base_altitude =  (base / 30.0);
+}
+
 
 void bme280_init(BME_280_t* BME_sensor, I2C_HandleTypeDef* I2C_bme)
 {

@@ -14,7 +14,7 @@
 
 void data_logger_init();
 void log_datas(float altitude, float lat, float lon, float time, float altitude_pressure, float temperature, float humidity);
-void log_normal_packet_data(unsigned char* packet_data);
+void log_normal_packet_data(unsigned char* packet_data, char* name);
 void flush_packet_buffer(void);
 void force_flush_buffer(void);
 

@@ -112,6 +112,7 @@ float bme280_get_altitude();
 float bme280_get_pressure();
 float bme280_get_temperature();
 float bme280_get_humidity();
+void setBase();
 uint32_t bme280_get_timestamp();
 
 #endif /* INC_BME280_H_ */

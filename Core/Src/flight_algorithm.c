@@ -163,7 +163,7 @@ void flight_algorithm_update(BME_280_t* bme, bmi088_struct_t* bmi, sensor_fusion
                 deploy_drogue_parachute();
             }
 
-            if (is_armed && sensor_fusion->velocity < 0.0f && sensor_fusion->velocity < prev_velocity && deployed_velocity) {
+            if (is_armed && sensor_fusion->velocity < 0.0f && deployed_velocity) {
                 apogee_counter++;
                 if (apogee_counter >= 4) {  // Confirm apogee after 5 consecutive samples
                     status_bits |= 0x0010; // Set Bit 4: Rocket altitude started decreasing
@@ -176,7 +176,6 @@ void flight_algorithm_update(BME_280_t* bme, bmi088_struct_t* bmi, sensor_fusion
             } else {
                 apogee_counter = 0;
             }
-            prev_velocity = sensor_fusion->velocity;
 
             // Deploy main parachute at designated altitude
             if (drogue_deployed && bme->altitude < main_chute_altitude) {

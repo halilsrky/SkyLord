@@ -231,7 +231,7 @@ void bmi088_config(bmi088_struct_t* BMI)
 
 	HAL_NVIC_EnableIRQ(BMI->device_config.acc_IRQ);
 	HAL_NVIC_EnableIRQ(BMI->device_config.gyro_IRQ);
-	HAL_Delay(70);
+	HAL_Delay(10);
 }
 
 

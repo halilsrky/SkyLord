@@ -128,6 +128,12 @@ uint8_t restore_critical_data_from_backup_sram(BME_280_t* bme, bmi088_struct_t* 
     // Restore base altitude
     bme->base_altitude = backup_data->base_altitude;
     
+    // Additional validation: ensure base_altitude is reasonable
+    if (backup_data->base_altitude < -1000.0f || backup_data->base_altitude > 10000.0f) {
+        // Invalid base altitude, set to safe default
+        bme->base_altitude = 0.0f;
+    }
+    
     return 1; // Success
 }
 

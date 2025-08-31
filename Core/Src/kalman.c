@@ -36,9 +36,9 @@ void KalmanFilter_Init(KalmanFilter_t *kf) {
     kf->P[2][2] = 1.0f;     // Acceleration uncertainty (1 m/s²)
 
     // Set noise parameters - these can be tuned
-    kf->process_noise = 0.01f;         // Process noise
-    kf->measurement_noise_alt = 0.005f;  // Altitude measurement noise
-    kf->measurement_noise_acc = 5.0f;  // Acceleration measurement noise
+    kf->process_noise = 0.05f;         // Model gürültüsü (biraz artırıldı)
+    kf->measurement_noise_alt = 3.0f;  // BME280 yükseklik gürültüsü (daha realistik)
+    kf->measurement_noise_acc = 0.05f; // BMI088 ivme gürültüsü (başlangıç için)
 
     // Initialize apogee detection variables
     kf->apogee_detected = 0;

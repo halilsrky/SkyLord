@@ -45,13 +45,18 @@ void data_logger_init()
 		f_close(&fil);
 	}
 	
+	fres = f_open(&fil, "sut.bin", FA_WRITE | FA_OPEN_ALWAYS);
+		if (fres == FR_OK) {
+			f_close(&fil);
+		}
+
 	// Buffer'ı sıfırla
 	buffer_index = 0;
 	flush_counter = 0;
 	file_open = 0;
 }
 
-void log_normal_packet_data(unsigned char* packet_data)
+void log_normal_packet_data(unsigned char* packet_data, char* name)
 {
 
 	if (sd_open == 0) {
@@ -66,7 +71,7 @@ void log_normal_packet_data(unsigned char* packet_data)
 	if (buffer_index >= BUFFER_SIZE) {
 		// Dosya açık değilse aç
 		if (!file_open) {
-			fres = f_open(&fil, "skylord.bin", FA_WRITE | FA_OPEN_ALWAYS);
+			fres = f_open(&fil, name, FA_WRITE | FA_OPEN_ALWAYS);
 			if (fres == FR_OK) {
 				f_lseek(&fil, f_size(&fil));  // Dosya sonuna git
 				file_open = 1;

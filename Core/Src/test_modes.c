@@ -9,12 +9,22 @@
 #include "packet.h"
 #include "flight_algorithm.h"
 #include <string.h>
+#include "data_logger.h"
+#include "l86_gnss.h"
+#include "filter.h"
+
 
 // SIT packet buffer
 extern unsigned char sit_paket[36];
+extern unsigned char sd_paket[64];
+
 extern sensor_fusion_t sensor_output;
 extern UART_HandleTypeDef huart4;
 
+#define G_CONST 9.80665f
+#define DEG2RAD(x) ((x) * 3.14159265358979323846f / 180.0f)
+
+BaroAccelFilter filter_1;
 
 /**
  * @brief Initialize test modes module
@@ -61,6 +71,7 @@ uint16_t test_modes_handle_sut(sut_data_t* sut_data, sensor_fusion_t* sensor_out
     // Convert SUT data to BME and BMI structures
     BME_280_t bme_sut = {0};
     bmi088_struct_t bmi_sut = {0};
+    gps_data_t gnss_data = {0};                  // L86 GNSS receiver data
 
     // Fill BME data
     bme_sut.altitude = sut_data->altitude;
@@ -76,8 +87,12 @@ uint16_t test_modes_handle_sut(sut_data_t* sut_data, sensor_fusion_t* sensor_out
 
     // Process synthetic data through sensor fusion first
     //sensor_fusion_update_mahony(&bmi_sut, sensor_output);
-	sensor_fusion_update_kalman(&bme_sut, &bmi_sut, sensor_output);
+	//sensor_fusion_update_kalman(&bme_sut, &bmi_sut, sensor_output);
 
+    baf_step(&filter_1, bme_sut->altitude, bmi_sut.datas.acc_z/9.81, 0.01);
+
+	addDataPacketSD(&bme_sut, &bmi_sut, &gnss_data, sensor_output, 0, 0);
+	log_normal_packet_data(sd_paket, "sut.bin");
     // Then run flight algorithm with fused data
     flight_algorithm_update(&bme_sut, &bmi_sut, sensor_output);
     uint16_t status_bits = flight_algorithm_get_status_bits();
