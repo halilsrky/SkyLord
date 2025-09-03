@@ -8,25 +8,6 @@
 
 uint8_t data_packet[9] ={0};
 
-static void view_e22_response(UART_HandleTypeDef* lora_uart_hndl, UART_HandleTypeDef* serial_uart_hndl)
-{
-	while (1)
-	{
-	  if (__HAL_UART_GET_FLAG(lora_uart_hndl, UART_FLAG_RXNE) == SET)
-	  {
-	    uint8_t dat[1];
-	    HAL_UART_Receive(lora_uart_hndl, (uint8_t *)dat, 1, 100);
-	    HAL_UART_Transmit(serial_uart_hndl, (uint8_t *)dat, 1, 100);
-	  }
-	  if (__HAL_UART_GET_FLAG(serial_uart_hndl, UART_FLAG_RXNE) == SET)
-	  {
-	    uint8_t dat[1];
-	    HAL_UART_Receive(serial_uart_hndl, (uint8_t *)dat, 1, 100);
-	    HAL_UART_Transmit(lora_uart_hndl, (uint8_t *)dat, 1, 100);
-	  }
-	}
-}
-
 /**
   * @brief  Initializes the lora module by configuration struct.
   * @param  lora_conf_struct: pointer to the lora configuration struct.

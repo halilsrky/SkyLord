@@ -1,3 +1,4 @@
+
 /**
  * @file sensor_fusion.h
  * @brief Sensor fusion interface for rocket flight control system
@@ -24,10 +25,11 @@ typedef struct {
     float roll;               // Roll angle
     uint8_t apogeeDetect;
     uint8_t accel_failure;    // İvme sensörü arıza bayrağı
+    uint8_t altitude_failure; // Yükseklik sensörü arıza bayrağı
 } sensor_fusion_t;
 
-void sensor_fusion_init(float a_bias);
-void sensor_fusion_update(BME_280_t* BME, bmi088_struct_t* BMI, sensor_fusion_t* sensor);
+void sensor_fusion_init();
+void sensor_fusion_update_kalman(BME_280_t* BME, bmi088_struct_t* BMI, sensor_fusion_t* sensor);
 
 
 #endif /* INC_SENSOR_FUSION_H_ */

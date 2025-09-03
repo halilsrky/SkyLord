@@ -64,17 +64,6 @@ FlightPhase_t flight_algorithm_get_phase(void);
 uint16_t flight_algorithm_get_status_bits(void);
 uint8_t flight_algorithm_get_durum_verisi(void);
 
-/**
- * @brief Set flight parameters
- * @param launch_accel_threshold Launch detection acceleration threshold (m/s²)
- * @param min_arming_altitude Minimum altitude for arming (m)
- * @param main_chute_altitude Main parachute deployment altitude (m)
- * @param max_angle_threshold Maximum angle threshold for drogue deployment (degrees)
- */
-void flight_algorithm_set_parameters(float launch_accel_threshold,
-                                    float min_arming_altitude,
-                                    float main_chute_altitude,
-                                    float max_angle_threshold);
 
 /**
  * @brief Restore flight algorithm state from backup data

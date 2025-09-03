@@ -1,3 +1,4 @@
+
 /* USER CODE BEGIN Header */
 /**
   ******************************************************************************
@@ -44,8 +45,7 @@
 #include "packet.h"                    // Telemetry packet handling
 #include "l86_gnss.h"                  // L86 GPS/GNSS module
 #include "data_logger.h"
-#include "dwt_profiler.h"
-#include "w25_flash_memory.h"
+
 
 /* Test and diagnostic modules */
 #include "test_modes.h"                // System test modes (SIT, SUT)
@@ -151,7 +151,6 @@ uint32_t lastUpdate = 0;               // Last sensor update timestamp
 extern uint8_t Gain;                   // Kalman filter gain parameter
 extern uint8_t gyroOnlyMode;           // Gyroscope-only mode flag
 extern volatile uint8_t tx_timer_flag_w25q;
-extern uint8_t sector_erase_started;
 
 /* Interrupt and communication flags */
 volatile uint8_t usart4_packet_ready = 0;  // UART4 packet received flag
@@ -251,10 +250,10 @@ int main(void)
 	HAL_TIM_Base_Start_IT(&htim2);
 	HAL_NVIC_SetPriority(TIM2_IRQn, 1, 0);
 	HAL_NVIC_EnableIRQ(TIM2_IRQn);
-	
+
 	// Configure external interrupt priorities
 	HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 1);
-	
+
 	// Enable external interrupts for IMU data ready signals
 	HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 
@@ -273,14 +272,13 @@ int main(void)
 	uint8_t reset_occurred = is_reset_occurred(sTime, sDate);
 
 	// Configure and initialize flight algorithm BEFORE restore (so it can be overwritten)
-	flight_algorithm_set_parameters(FLIGHT_ACCEL_THRESHOLD, FLIGHT_MAX_ALTITUDE, FLIGHT_MIN_ALTITUDE, FLIGHT_MAX_VELOCITY);
 	flight_algorithm_init();
-	
+
 	if (reset_occurred) {
-		
+
 		// Initialize UART handler first (before restoring data)
 		uart_handler_init();
-		
+
 		// Initialize BME280 barometric pressure sensor
 		bme280_begin();
 		// Initialize BMI088 with restored offsets
@@ -304,10 +302,10 @@ int main(void)
 	} else {
 		// Normal startup - perform full calibration
 		save_time(sTime, sDate); // Save current time for next reset detection
-		
+
 		// Initialize UART handler
 		uart_handler_init();
-		
+
 		/* ==== SENSOR INITIALIZATION ==== */
 		// Initialize BME280 sensor (temperature, humidity, pressure)
 		bme280_begin();
@@ -359,9 +357,7 @@ int main(void)
 	L86_GNSS_Init(&huart5);
 
 	/* ==== DATA LOGGER INITIALIZATION ==== */
-	dwt_profiler_init();
 	data_logger_init();
-	W25Q_Init(&hspi2);
 
 	HAL_GPIO_WritePin(CAMERA_GPIO_Port, CAMERA_Pin, SET);
     HAL_Delay(30);
@@ -380,23 +376,16 @@ int main(void)
 
 
 		/*CONTINUOUS SENSOR UPDATES*/
-	    //PROFILE_START(PROF_BMI088_UPDATE);
 		bmi088_update(&BMI_sensor);		// Update IMU sensor data (accelerometer + gyroscope) - High frequency sampling
-		//PROFILE_END(PROF_BMI088_UPDATE);
 
-		//PROFILE_START(PROF_BME280_UPDATE);
 		bme280_update(); 		// Update barometric pressure sensor data for altitude estimation
-		//PROFILE_END(PROF_BME280_UPDATE);
 
-		/*COMMAND PROCESSING*/
-		//PROFILE_START(PROF_TEST);
 		uart_handler_process_packets();		// Process incoming UART packets and handle system mode changes
-		//PROFILE_END(PROF_TEST);
 
 		// Handle command processing and system state transitions
 		if (uart_handler_command_ready()) {
 			uart_handler_clear_command_flag();
-			
+
 			// Reset flight algorithm state when switching to NORMAL operational mode
 			if (uart_handler_get_mode() == MODE_NORMAL) {
 				flight_algorithm_reset();
@@ -410,49 +399,33 @@ int main(void)
 		if (tx_timer_flag_100ms) {
 			tx_timer_flag_100ms = 0;
 
-			// Update GPS/GNSS data for position and velocity tracking
-			//PROFILE_START(PROF_GNSS_UPDATE);
+
 			L86_GNSS_Update(&gnss_data);
-			//L86_GNSS_Print_Info(&gnss_data, &huart1);
-			//PROFILE_END(PROF_GNSS_UPDATE);
 
 			// Update current time for reset detection
 			HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
 			HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
-			
+
 			save_time(sTime, sDate);
 
 			// Check high-speed data acquisition status
 			HSD_StatusCheck();
 
-			/* Optional debug and monitoring functions (currently disabled for performance) */
-			//L86_GNSS_Print_Info(&gnss_data, &huart4);     // Transmit GPS information for debugging
-			//IMU_visual();                                  // Send IMU data for external visualization tools
 
-			
+
 			/*MODE-SPECIFIC OPERATIONS*/
 			SystemMode_t current_mode = uart_handler_get_mode();
-			
+
 			switch (current_mode) {
 				case MODE_NORMAL:
-					/* Full operational flight mode with complete sensor fusion and flight control */
-					
+
 					read_ADC();
 
-					// Enhanced sensor fusion using Kalman filter for precise state estimation
-					//PROFILE_START(PROF_SENSOR_FUSION);
-					sensor_fusion_update(&BME280_sensor, &BMI_sensor, &sensor_output);
-					//PROFILE_END(PROF_SENSOR_FUSION);
+					sensor_fusion_update_kalman(&BME280_sensor, &BMI_sensor, &sensor_output);
 
-					// Execute flight algorithm for launch detection, apogee detection, and recovery deployment
-					//PROFILE_START(PROF_FLIGHT_ALGORITHM);
 					flight_algorithm_update(&BME280_sensor, &BMI_sensor, &sensor_output);
-					//PROFILE_END(PROF_FLIGHT_ALGORITHM);
-					
-					// Package all sensor data into telemetry packet for ground station transmission
-					//PROFILE_START(PROF_PACKET_COMPOSE);
+
 					addDataPacketNormal(&BME280_sensor, &BMI_sensor, &gnss_data, &sensor_output, voltage_V, current_mA);
-					//PROFILE_END(PROF_PACKET_COMPOSE);
 
 
 					addDataPacketSD(&BME280_sensor, &BMI_sensor, &gnss_data, &sensor_output, voltage_V, current_mA);
@@ -461,26 +434,10 @@ int main(void)
 					HAL_UART_Transmit(&huart1, (uint8_t*)normal_paket, 62, 100);
 
 
-					//PROFILE_START(PROF_SD_LOGGER);
 					log_normal_packet_data(sd_paket, "skylord.bin");
-					//PROFILE_END(PROF_SD_LOGGER);
-					// Save only dynamic flight data to backup SRAM every 10 seconds
-					//PROFILE_START(PROF_FLASH);
-					//W25Q_WriteToBufferFlushOnSectorFull(sd_paket);
-					//PROFILE_END(PROF_FLASH);
-
-					//dwt_profiler_print_compact();
-
-					//PROFILE_START(PROF_FLASH);
-					//W25Q_WriteToBufferFlushOnSectorFull(sd_paket);
-					//PROFILE_END(PROF_FLASH);
-
-					//HAL_UART_Transmit(&huart1, (uint8_t*)normal_paket, 62, 100);
 
 
-					/* Optional real-time telemetry transmission (disabled to reduce latency) */
-					//uint16_t status_bits = flight_algorithm_get_status_bits();
-					//uart_handler_send_status(status_bits);
+
 					break;
 
 				case MODE_SIT:
@@ -492,7 +449,7 @@ int main(void)
 					/* SUT Mode: Validates specific algorithm and calibration logic with synthetic flight data (no real-time sensor input) */
 					algorithm_update_sut();
 					break;
-					
+
 				default:
 					/* Unknown mode - Log error or switch to safe mode */
 					// TODO: Add error handling for unknown system modes
@@ -1259,11 +1216,6 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 	    tx_timer_flag_100ms = 1;   // 100ms flag
 	    tx_timer_flag_1s++;      // 1s flag (counts to 10)
 	    tx_timer_flag_20s++;
-	    if(sector_erase_started == 1)
-		{
-			tx_timer_flag_w25q++;
-		}
-
 	}
 }
 

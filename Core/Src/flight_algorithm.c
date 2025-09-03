@@ -20,9 +20,9 @@ static FlightPhase_t current_phase = PHASE_IDLE;
 
 // Flight parameters (configurable)
 static float launch_accel_threshold = 40.0f;  // m/s²
-static float min_arming_altitude = 2000.0f;   // meters
-static float main_chute_altitude = 550.0f;    // meters
-static float max_angle_threshold = 75.0f;     // degrees
+static float min_arming_altitude = 1200.0f;   // meters
+static float main_chute_altitude = 600.0f;    // meters
+static float max_angle_threshold = 55.0f;     // degrees
 static float rising_vel_treshold = 30.0f;
 
 // Flight state tracking
@@ -183,7 +183,7 @@ void flight_algorithm_update(BME_280_t* bme, bmi088_struct_t* bmi, sensor_fusion
             // Check if angle exceeds threshold with counter
             if (is_armed && (fabs(bmi->datas.theta) > max_angle_threshold) && deployed_angle) {
                 angle_threshold_counter++;
-                if (angle_threshold_counter >= 4) {
+                if (angle_threshold_counter >= 3) {
                     drogue_deployed = 1;
                     deployed_angle = 0;
                     status_bits |= 0x0008; // Set Bit 3: Rocket body angle exceeds threshold
@@ -211,7 +211,7 @@ void flight_algorithm_update(BME_280_t* bme, bmi088_struct_t* bmi, sensor_fusion
             // Deploy main parachute at designated altitude with counter
             if (drogue_deployed && bme->altitude < main_chute_altitude) {
                 main_altitude_counter++;
-                if (main_altitude_counter >= 4) {
+                if (main_altitude_counter >= 3) {
                     current_phase = PHASE_MAIN_DESCENT;
                     status_bits |= 0x0040; // Set Bit 6: Rocket altitude below specified altitude
                     status_bits |= 0x0080; // Set Bit 7: Main parachute deployment command generated
@@ -267,20 +267,6 @@ uint16_t flight_algorithm_get_status_bits(void)
 uint8_t flight_algorithm_get_durum_verisi(void)
 {
     return durum_verisi;
-}
-
-/**
- * @brief Set flight parameters
- */
-void flight_algorithm_set_parameters(float launch_accel_threshold_param,
-                                   float min_arming_altitude_param,
-                                   float main_chute_altitude_param,
-                                   float max_angle_threshold_param)
-{
-    launch_accel_threshold = launch_accel_threshold_param;
-    min_arming_altitude = min_arming_altitude_param;
-    main_chute_altitude = main_chute_altitude_param;
-    max_angle_threshold = max_angle_threshold_param;
 }
 
 uint32_t flight_algorithm_get_start_time(void)

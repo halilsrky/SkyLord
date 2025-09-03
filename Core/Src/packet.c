@@ -233,7 +233,7 @@ void addDataPacketSD(BME_280_t* BME, bmi088_struct_t* BMI, gps_data_t* GPS, sens
 	  sd_paket[4] = irtifa_float32_uint8_donusturucu.array[3];
 
 	  FLOAT32_UINT8_DONUSTURUCU roket_gps_irtifa_float32_uint8_donusturucu;
-	  roket_gps_irtifa_float32_uint8_donusturucu.sayi = (GPS->altitude); // Roket GPS Irtifa degerinin atamasini yapiyoruz.
+	  roket_gps_irtifa_float32_uint8_donusturucu.sayi = (sensor_fusion->filtered_altitude); // Roket GPS Irtifa degerinin atamasini yapiyoruz.
 	  sd_paket[5] = roket_gps_irtifa_float32_uint8_donusturucu.array[0];
 	  sd_paket[6] = roket_gps_irtifa_float32_uint8_donusturucu.array[1];
 	  sd_paket[7] = roket_gps_irtifa_float32_uint8_donusturucu.array[2];

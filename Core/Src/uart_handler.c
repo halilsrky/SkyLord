@@ -73,7 +73,6 @@ void process_command_packet(uint8_t* buffer)
                     break;
                 case CMD_SUT:
                     current_mode = MODE_SUT;
-                    sensor_fusion_init(0.0);
                     break;
                 case CMD_STOP:
                     current_mode = MODE_NORMAL;
