@@ -99,6 +99,8 @@ void uart_handler_clear_command_flag(void);
  */
 void uart_handler_clear_sut_flag(void);
 
+void set_current_mode(SystemMode_t test_mode);
+
 // External dependencies from main.c
 extern volatile uint8_t usart4_packet_ready;
 extern volatile uint16_t usart4_packet_size;

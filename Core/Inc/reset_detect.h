@@ -12,6 +12,8 @@
 #include "bme280.h"
 #include "bmi088.h"
 #include "flight_algorithm.h"
+#include "uart_handler.h"
+#include "queternion.h"
 
 extern RTC_HandleTypeDef hrtc;
 
@@ -28,6 +30,23 @@ typedef struct {
     uint8_t main_deployed;
     uint32_t flight_start_time;
     float base_altitude;
+    float quaternion[4];                // [w, x, y, z] latest quaternion values
+    SystemMode_t test_mode;             // Current test mode (NORMAL, SIT, SUT)
+    
+    // Additional flight algorithm state variables
+    uint8_t is_rising;
+    uint8_t is_stabilized;
+    uint8_t deployed_angle;
+    uint8_t deployed_velocity;
+    int apogee_counter;
+    int burnout_counter;
+    float prev_velocity;
+    uint8_t altitude_decrease_count;
+    float prev_altitude;
+    uint8_t drogue_pulse_active;
+    uint32_t drogue_pulse_start_time;
+    uint8_t main_pulse_active;
+    uint32_t main_pulse_start_time;
 } flight_critical_data_t;
 
 // Complete backup SRAM data structure

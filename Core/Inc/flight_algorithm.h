@@ -88,6 +88,52 @@ void flight_algorithm_restore_state(FlightPhase_t phase,
                                   uint8_t durum_verisi, 
                                   uint32_t flight_start_time);
 
+/**
+ * @brief Get all flight algorithm state for backup
+ */
+uint8_t flight_algorithm_get_is_rising(void);
+uint8_t flight_algorithm_get_is_stabilized(void);
+uint8_t flight_algorithm_get_is_armed(void);
+uint8_t flight_algorithm_get_drogue_deployed(void);
+uint8_t flight_algorithm_get_main_deployed(void);
+uint8_t flight_algorithm_get_deployed_angle(void);
+uint8_t flight_algorithm_get_deployed_velocity(void);
+int flight_algorithm_get_apogee_counter(void);
+int flight_algorithm_get_burnout_counter(void);
+float flight_algorithm_get_prev_velocity(void);
+uint8_t flight_algorithm_get_altitude_decrease_count(void);
+float flight_algorithm_get_prev_altitude(void);
+uint8_t flight_algorithm_get_drogue_pulse_active(void);
+uint32_t flight_algorithm_get_drogue_pulse_start_time(void);
+uint8_t flight_algorithm_get_main_pulse_active(void);
+uint32_t flight_algorithm_get_main_pulse_start_time(void);
+
+/**
+ * @brief Restore complete flight algorithm state from backup data
+ */
+void flight_algorithm_restore_complete_state(
+    FlightPhase_t phase,
+    uint16_t status_bits,
+    uint8_t durum_verisi,
+    uint32_t flight_start_time,
+    uint8_t is_rising,
+    uint8_t is_stabilized,
+    uint8_t is_armed,
+    uint8_t drogue_deployed,
+    uint8_t main_deployed,
+    uint8_t deployed_angle,
+    uint8_t deployed_velocity,
+    int apogee_counter,
+    int burnout_counter,
+    float prev_velocity,
+    uint8_t altitude_decrease_count,
+    float prev_altitude,
+    uint8_t drogue_pulse_active,
+    uint32_t drogue_pulse_start_time,
+    uint8_t main_pulse_active,
+    uint32_t main_pulse_start_time
+);
+
 void deploy_drogue_parachute(void);
 void deploy_main_parachute(void);
 void deploy_parachute_update(void);

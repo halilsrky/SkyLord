@@ -11,8 +11,6 @@
 #include <string.h>
 #include "data_logger.h"
 #include "l86_gnss.h"
-#include "filter.h"
-
 
 // SIT packet buffer
 extern unsigned char sit_paket[36];
@@ -21,10 +19,6 @@ extern unsigned char sd_paket[64];
 extern sensor_fusion_t sensor_output;
 extern UART_HandleTypeDef huart4;
 
-#define G_CONST 9.80665f
-#define DEG2RAD(x) ((x) * 3.14159265358979323846f / 180.0f)
-
-BaroAccelFilter filter_1;
 
 /**
  * @brief Initialize test modes module
@@ -78,19 +72,15 @@ uint16_t test_modes_handle_sut(sut_data_t* sut_data, sensor_fusion_t* sensor_out
     bme_sut.pressure = sut_data->pressure;
 
     // Fill BMI data
-    bmi_sut.datas.acc_x = sut_data->acc_x;
+    bmi_sut.datas.acc_z = sut_data->acc_x;
     bmi_sut.datas.acc_y = sut_data->acc_y;
-    bmi_sut.datas.acc_z = sut_data->acc_z;
-    bmi_sut.datas.gyro_x = sut_data->gyro_x;
+    bmi_sut.datas.acc_x = (-sut_data->acc_z);
+    bmi_sut.datas.gyro_z = sut_data->gyro_x;
     bmi_sut.datas.theta = sut_data->gyro_y;
-    bmi_sut.datas.gyro_z = sut_data->gyro_z;
+    bmi_sut.datas.gyro_x = sut_data->gyro_z;
 
     // Process synthetic data through sensor fusion first
-    //sensor_fusion_update_mahony(&bmi_sut, sensor_output);
-	//sensor_fusion_update_kalman(&bme_sut, &bmi_sut, sensor_output);
-
-    baf_step(&filter_1, bme_sut->altitude, bmi_sut.datas.acc_z/9.81, 0.01);
-
+    sensor_fusion_update(&bme_sut, &bmi_sut, sensor_output);
 	addDataPacketSD(&bme_sut, &bmi_sut, &gnss_data, sensor_output, 0, 0);
 	log_normal_packet_data(sd_paket, "sut.bin");
     // Then run flight algorithm with fused data

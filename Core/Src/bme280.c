@@ -107,6 +107,7 @@ void bme280_config()
     retVal = HAL_I2C_Mem_Write(I2C_, BME280_ADD, BME280_CONFIG, I2C_MEMADD_SIZE_8BIT, &data_ctrl, 1, 50);
 
     bme280_update();
+
     UNUSED(retVal);
 }
 
@@ -123,6 +124,7 @@ void setBase(){
 	}
 
 	BME->base_altitude =  (base / 30.0);
+	
 }
 
 

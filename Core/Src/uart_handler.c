@@ -7,6 +7,7 @@
 
 #include "uart_handler.h"
 #include "packet.h"
+#include "sensor_fusion.h"
 #include <string.h>
 
 // Private variables
@@ -72,6 +73,7 @@ void process_command_packet(uint8_t* buffer)
                     break;
                 case CMD_SUT:
                     current_mode = MODE_SUT;
+                    sensor_fusion_init(0.0);
                     break;
                 case CMD_STOP:
                     current_mode = MODE_NORMAL;
@@ -179,4 +181,8 @@ void uart_handler_send_status(uint16_t status_bits)
 
         uart4_send_packet_dma(status_packet_dma, 6);
     }
+}
+
+void set_current_mode(SystemMode_t test_mode){
+	current_mode = test_mode;
 }

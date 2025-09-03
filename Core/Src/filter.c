@@ -20,7 +20,7 @@ void baf_init(BaroAccelFilter *f, float a0, float alpha, float beta, float time)
 
 	f->h = 0.0;
     f->v = 0;
-    f->abias = a0 * TO_SI;
+    f->abias = a0;
     f->alpha = alpha;
     f->beta = beta;
     f->last_time = time;
@@ -34,7 +34,6 @@ void baf_step(BaroAccelFilter *f, float h_meas, float a_meas, float time)
 	dt = dt / 1000;
 	f->dt = dt;
 	f->last_time = time;
-	a_meas = a_meas * TO_SI;
 
     // 1) Öngörü: ivmeyi kullanarak hız/durum tahmini
     float a_corr = a_meas - f->abias;   // bias düzeltilmiş ivme

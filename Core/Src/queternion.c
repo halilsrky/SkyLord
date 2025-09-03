@@ -302,8 +302,8 @@ void getInitialQuaternion() {
     double accel_temp[3];
 
     accel_temp[0] = (double)BMI_sensor.datas.acc_y;
-    accel_temp[1] = (double)-BMI_sensor.datas.acc_z;
-    accel_temp[2] = (double)BMI_sensor.datas.acc_x;
+    accel_temp[1] = (double)BMI_sensor.datas.acc_x;
+    accel_temp[2] = (double)-BMI_sensor.datas.acc_z;
 
     accel_temp[0] /= norm;
     accel_temp[1] /= norm;
@@ -337,4 +337,20 @@ float invSqrt(float x) {
 
 float* getQuaternion() {
     return q;
+}
+
+void setQuaternion(float w, float x, float y, float z) {
+    q[0] = w;
+    q[1] = x;
+    q[2] = y;
+    q[3] = z;
+    
+    // Normalize the quaternion to ensure it's valid
+    float norm = sqrtf(q[0]*q[0] + q[1]*q[1] + q[2]*q[2] + q[3]*q[3]);
+    if (norm > 1e-6f) {
+        q[0] /= norm;
+        q[1] /= norm;
+        q[2] /= norm;
+        q[3] /= norm;
+    }
 }

@@ -19,10 +19,11 @@
 static FlightPhase_t current_phase = PHASE_IDLE;
 
 // Flight parameters (configurable)
-static float launch_accel_threshold = 25.0f;  // m/s²
-static float min_arming_altitude = 1800.0f;   // meters
-static float main_chute_altitude = 500.0f;    // meters
-static float max_angle_threshold = 70.0f;     // degrees
+static float launch_accel_threshold = 40.0f;  // m/s²
+static float min_arming_altitude = 2000.0f;   // meters
+static float main_chute_altitude = 550.0f;    // meters
+static float max_angle_threshold = 75.0f;     // degrees
+static float rising_vel_treshold = 30.0f;
 
 // Flight state tracking
 static uint8_t is_rising = 0;
@@ -34,6 +35,11 @@ static uint8_t drogue_deployed = 0;
 static uint8_t main_deployed = 0;
 int apogee_counter = 0;
 int burnout_counter = 1;
+int launch_accel_counter = 0;
+int launch_vel_counter = 0;
+int altitude_arming_counter = 0;
+int angle_threshold_counter = 0;
+int main_altitude_counter = 0;
 float prev_velocity = 0;
 
 static uint32_t flight_start_time = 0;
@@ -55,9 +61,6 @@ static uint32_t drogue_pulse_start_time = 0;
 // Main parachute deployment state
 static uint8_t main_pulse_active = 0;
 static uint32_t main_pulse_start_time = 0;
-
-
-
 
 
 /**
@@ -86,6 +89,11 @@ void flight_algorithm_reset(void)
     deployed_velocity = 1;
     deployed_angle = 1;
     apogee_counter = 0;
+    launch_accel_counter = 0;
+    launch_vel_counter = 0;
+    altitude_arming_counter = 0;
+    angle_threshold_counter = 0;
+    main_altitude_counter = 0;
     prev_velocity = 0;
     durum_verisi = 1;
     drogue_pulse_active = 0;
@@ -110,20 +118,31 @@ void flight_algorithm_update(BME_280_t* bme, bmi088_struct_t* bmi, sensor_fusion
     // State machine for flight phases
     switch (current_phase) {
         case PHASE_IDLE:
-            // Detect launch using acceleration threshold
+            // Detect launch using acceleration threshold with counter
             if (total_acceleration > launch_accel_threshold) {
-                current_phase = PHASE_BOOST;
-                is_rising = 1;
-                flight_start_time = HAL_GetTick();
-                status_bits |= 0x0001; // Set Bit 0: Rocket launch detected
-                durum_verisi = 2;
+                launch_accel_counter++;
+                if (launch_accel_counter >= 4) {
+                    current_phase = PHASE_BOOST;
+                    is_rising = 1;
+                    flight_start_time = HAL_GetTick();
+                    status_bits |= 0x0001; // Set Bit 0: Rocket launch detected
+                    durum_verisi = 2;
+                }
+            } else {
+                launch_accel_counter = 0; // Reset counter if threshold not exceeded
             }
-            else if(sensor_fusion->velocity > RISING_VELOCITY_TRESHOLD){
-            	current_phase = PHASE_BOOST;
-				is_rising = 1;
-				flight_start_time = HAL_GetTick();
-				status_bits |= 0x0001; // Set Bit 0: Rocket launch detected
-				durum_verisi = 2;
+            
+            if(sensor_fusion->velocity > rising_vel_treshold){
+                launch_vel_counter++;
+                if (launch_vel_counter >= 4) {
+                    current_phase = PHASE_BOOST;
+                    is_rising = 1;
+                    flight_start_time = HAL_GetTick();
+                    status_bits |= 0x0001; // Set Bit 0: Rocket launch detected
+                    durum_verisi = 2;
+                }
+            } else {
+                launch_vel_counter = 0; // Reset counter if threshold not exceeded
             }
             break;
 
@@ -135,32 +154,44 @@ void flight_algorithm_update(BME_280_t* bme, bmi088_struct_t* bmi, sensor_fusion
                 status_bits |= 0x0002; // Set Bit 1: Motor burn prevention period ended
                 durum_verisi = 3;
             }
-            if(bmi->datas.acc_z < 0.0 && burnout_counter < 10){
+            if((-bmi->datas.acc_x) < 0.0){
             	burnout_counter++;
-            }
-            if(burnout_counter == 10){
-                current_phase = PHASE_COAST;
-                is_stabilized = 1;
-                status_bits |= 0x0002; // Set Bit 1: Motor burn prevention period ended
-                durum_verisi = 3;
+            	if(burnout_counter >= 4){
+					current_phase = PHASE_COAST;
+					is_stabilized = 1;
+					status_bits |= 0x0002; // Set Bit 1: Motor burn prevention period ended
+					durum_verisi = 3;
+				}
+            } else {
+            	burnout_counter = 0;
             }
             break;
 
         case PHASE_COAST:
-            // Check minimum arming altitude
+            // Check minimum arming altitude with counter
             if (bme->altitude > min_arming_altitude && !is_armed) {
-                is_armed = 1;
-                status_bits |= 0x0004; // Set Bit 2: Minimum altitude threshold exceeded
-                durum_verisi = 4;
+                altitude_arming_counter++;
+                if (altitude_arming_counter >= 4) {
+                    is_armed = 1;
+                    status_bits |= 0x0004; // Set Bit 2: Minimum altitude threshold exceeded
+                    durum_verisi = 4;
+                }
+            } else {
+                altitude_arming_counter = 0; // Reset counter if threshold not exceeded
             }
 
-            // Check if angle exceeds threshold
+            // Check if angle exceeds threshold with counter
             if (is_armed && (fabs(bmi->datas.theta) > max_angle_threshold) && deployed_angle) {
-                drogue_deployed = 1;
-                deployed_angle = 0;
-                status_bits |= 0x0008; // Set Bit 3: Rocket body angle exceeds threshold
-                durum_verisi = 5;
-                deploy_drogue_parachute();
+                angle_threshold_counter++;
+                if (angle_threshold_counter >= 4) {
+                    drogue_deployed = 1;
+                    deployed_angle = 0;
+                    status_bits |= 0x0008; // Set Bit 3: Rocket body angle exceeds threshold
+                    durum_verisi = 5;
+                    deploy_drogue_parachute();
+                }
+            } else {
+                angle_threshold_counter = 0; // Reset counter if threshold not exceeded
             }
 
             if (is_armed && sensor_fusion->velocity < 0.0f && deployed_velocity) {
@@ -177,15 +208,20 @@ void flight_algorithm_update(BME_280_t* bme, bmi088_struct_t* bmi, sensor_fusion
                 apogee_counter = 0;
             }
 
-            // Deploy main parachute at designated altitude
+            // Deploy main parachute at designated altitude with counter
             if (drogue_deployed && bme->altitude < main_chute_altitude) {
-                current_phase = PHASE_MAIN_DESCENT;
-                status_bits |= 0x0040; // Set Bit 6: Rocket altitude below specified altitude
-                status_bits |= 0x0080; // Set Bit 7: Main parachute deployment command generated
-                main_deployed = 1;
-                drogue_deployed = 0;
-                durum_verisi = 7;
-                deploy_main_parachute();
+                main_altitude_counter++;
+                if (main_altitude_counter >= 4) {
+                    current_phase = PHASE_MAIN_DESCENT;
+                    status_bits |= 0x0040; // Set Bit 6: Rocket altitude below specified altitude
+                    status_bits |= 0x0080; // Set Bit 7: Main parachute deployment command generated
+                    main_deployed = 1;
+                    drogue_deployed = 0;
+                    durum_verisi = 7;
+                    deploy_main_parachute();
+                }
+            } else {
+                main_altitude_counter = 0; // Reset counter if threshold not exceeded
             }
             break;
 
@@ -318,4 +354,116 @@ void flight_algorithm_restore_state(FlightPhase_t phase,
         main_deployed = 1;
         drogue_deployed = 0;
     }
+}
+
+// Getter functions for all flight algorithm state variables
+uint8_t flight_algorithm_get_is_rising(void) {
+    return is_rising;
+}
+
+uint8_t flight_algorithm_get_is_stabilized(void) {
+    return is_stabilized;
+}
+
+uint8_t flight_algorithm_get_is_armed(void) {
+    return is_armed;
+}
+
+uint8_t flight_algorithm_get_drogue_deployed(void) {
+    return drogue_deployed;
+}
+
+uint8_t flight_algorithm_get_main_deployed(void) {
+    return main_deployed;
+}
+
+uint8_t flight_algorithm_get_deployed_angle(void) {
+    return deployed_angle;
+}
+
+uint8_t flight_algorithm_get_deployed_velocity(void) {
+    return deployed_velocity;
+}
+
+int flight_algorithm_get_apogee_counter(void) {
+    return apogee_counter;
+}
+
+int flight_algorithm_get_burnout_counter(void) {
+    return burnout_counter;
+}
+
+float flight_algorithm_get_prev_velocity(void) {
+    return prev_velocity;
+}
+
+uint8_t flight_algorithm_get_altitude_decrease_count(void) {
+    return altitude_decrease_count;
+}
+
+float flight_algorithm_get_prev_altitude(void) {
+    return prev_altitude;
+}
+
+uint8_t flight_algorithm_get_drogue_pulse_active(void) {
+    return drogue_pulse_active;
+}
+
+uint32_t flight_algorithm_get_drogue_pulse_start_time(void) {
+    return drogue_pulse_start_time;
+}
+
+uint8_t flight_algorithm_get_main_pulse_active(void) {
+    return main_pulse_active;
+}
+
+uint32_t flight_algorithm_get_main_pulse_start_time(void) {
+    return main_pulse_start_time;
+}
+
+/**
+ * @brief Restore complete flight algorithm state from backup data
+ */
+void flight_algorithm_restore_complete_state(
+    FlightPhase_t phase,
+    uint16_t status_bits_restore,
+    uint8_t durum_verisi_restore,
+    uint32_t flight_start_time_restore,
+    uint8_t is_rising_restore,
+    uint8_t is_stabilized_restore,
+    uint8_t is_armed_restore,
+    uint8_t drogue_deployed_restore,
+    uint8_t main_deployed_restore,
+    uint8_t deployed_angle_restore,
+    uint8_t deployed_velocity_restore,
+    int apogee_counter_restore,
+    int burnout_counter_restore,
+    float prev_velocity_restore,
+    uint8_t altitude_decrease_count_restore,
+    float prev_altitude_restore,
+    uint8_t drogue_pulse_active_restore,
+    uint32_t drogue_pulse_start_time_restore,
+    uint8_t main_pulse_active_restore,
+    uint32_t main_pulse_start_time_restore
+) {
+    current_phase = phase;
+    status_bits = status_bits_restore;
+    durum_verisi = durum_verisi_restore;
+    flight_start_time = flight_start_time_restore;
+    is_rising = is_rising_restore;
+    is_stabilized = is_stabilized_restore;
+    is_armed = is_armed_restore;
+    drogue_deployed = drogue_deployed_restore;
+    main_deployed = main_deployed_restore;
+    deployed_angle = deployed_angle_restore;
+    deployed_velocity = deployed_velocity_restore;
+    apogee_counter = apogee_counter_restore;
+    burnout_counter = burnout_counter_restore;
+    prev_velocity = prev_velocity_restore;
+    altitude_decrease_count = altitude_decrease_count_restore;
+    prev_altitude = prev_altitude_restore;
+    drogue_pulse_active = drogue_pulse_active_restore;
+    drogue_pulse_start_time = drogue_pulse_start_time_restore;
+    main_pulse_active = main_pulse_active_restore;
+    main_pulse_start_time = main_pulse_start_time_restore;
 }

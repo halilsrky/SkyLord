@@ -10,6 +10,7 @@
 #include "quaternion.h"
 #include "flight_algorithm.h"
 #include <math.h>
+#include "filter.h"
 
 // M_PI tanımı yoksa tanımla
 #ifndef M_PI
@@ -19,11 +20,7 @@
 #define G_CONST 9.80665f
 #define DEG2RAD(x) ((x) * 3.14159265358979323846f / 180.0f)
 
-static float prev_filtered_altitude = 0.0f;
-static uint32_t prev_time = 0;
-
 /* Private variables */
-static KalmanFilter_t kalman;          // Kalman filter instance from kalman.h
 static uint8_t initialized = 0;        // Flag to track initialization
 static uint32_t last_kalman_update_time = 0;  // Timestamp of last Kalman update
 static uint32_t flight_start_time = 0;  // Timestamp when flight began (from flight algorithm)
@@ -37,12 +34,53 @@ static uint8_t accel_buffer_index = 0;        // Tampon indeksi
 static uint8_t accel_buffer_full = 0;         // Tampon doldu mu?
 static uint8_t accel_failure_detected = 0;    // Arıza tespit edildi mi?
 
-/* Dinamik arıza tespit eşik değerleri */
+/* Dinamik arıza tespiti eşik değerleri */
 #define THRUST_PHASE_DURATION_MS 15000  // İtki fazı süresi (15 saniye)
 #define ACCEL_MAX_VALUE_THRUST 150.0f   // İtki fazında max ivme (m/s²)
 #define ACCEL_MAX_STD_THRUST 50.0f      // İtki fazında max std sapma
 #define ACCEL_MAX_VALUE_CRUISE 50.0f    // Seyir fazında max ivme
 #define ACCEL_MAX_STD_CRUISE 15.0f      // Seyir fazında max std sapma
+
+/* Yükseklik arıza tespiti için değişkenler */
+#define ALT_BUFFER_SIZE 5
+static float alt_buffer[ALT_BUFFER_SIZE];
+static uint8_t alt_buffer_index = 0;
+static uint8_t alt_buffer_full = 0;
+static uint8_t altitude_failure_detected = 0;
+
+#define ALT_MAX_VALUE 10000.0f   // Maksimum yükseklik (m)
+#define ALT_MIN_VALUE -100.0f    // Minimum yükseklik (m)
+#define ALT_MAX_STD 100.0f       // Maksimum ani değişim (standart sapma)
+
+static float calculate_alt_std_deviation(void)
+{
+    if (!alt_buffer_full && alt_buffer_index < 2) return 0.0f;
+    int count = alt_buffer_full ? ALT_BUFFER_SIZE : alt_buffer_index;
+    float sum = 0.0f, mean = 0.0f, variance = 0.0f;
+    for (int i = 0; i < count; i++) {
+        sum += alt_buffer[i];
+    }
+    mean = sum / count;
+    for (int i = 0; i < count; i++) {
+        variance += (alt_buffer[i] - mean) * (alt_buffer[i] - mean);
+    }
+    variance /= count;
+    return sqrtf(variance);
+}
+
+static uint8_t detect_altitude_failure(float altitude)
+{
+    alt_buffer[alt_buffer_index] = altitude;
+    alt_buffer_index = (alt_buffer_index + 1) % ALT_BUFFER_SIZE;
+    if (alt_buffer_index == 0) {
+        alt_buffer_full = 1;
+    }
+    float std_dev = calculate_alt_std_deviation();
+    if (altitude > ALT_MAX_VALUE || altitude < ALT_MIN_VALUE || std_dev > ALT_MAX_STD) {
+        return 1;
+    }
+    return 0;
+}
 
 /**
  * @brief İvme değerlerinin standart sapmasını hesapla
@@ -132,16 +170,10 @@ static uint8_t detect_accel_failure(float accel)
 /**
  * @brief Initialize the sensor fusion module
  */
-void sensor_fusion_init()
+void sensor_fusion_init(float a_bias)
 {
-    // Sensörlerinize göre gürültü değerlerini ayarlayın - daha konservatif başlangıç
-    kalman.process_noise = 0.05f;         // Model gürültüsü (biraz artırıldı)
-    kalman.measurement_noise_alt = 1.0f;  // BME280 yükseklik gürültüsü (daha realistik)
-    kalman.measurement_noise_acc = 0.9f; // BMI088 ivme gürültüsü (başlangıç için)
-    
-    KalmanFilter_Init(&kalman);
 
-    baf_init(&filter_1, 0, 0.3, 0.2, (float)HAL_GetTick());
+    baf_init(&filter_1, a_bias, 0.3, 0.2, (float)HAL_GetTick() - 1 );
 
     // İvme arıza tespit değişkenlerini sıfırla
     for (int i = 0; i < ACCEL_BUFFER_SIZE; i++) {
@@ -151,15 +183,22 @@ void sensor_fusion_init()
     accel_buffer_full = 0;
     accel_failure_detected = 0;
 
+    // Yükseklik arıza tespit değişkenlerini sıfırla
+    for (int i = 0; i < ALT_BUFFER_SIZE; i++) {
+        alt_buffer[i] = 0.0f;
+    }
+    alt_buffer_index = 0;
+    alt_buffer_full = 0;
+    altitude_failure_detected = 0;
+
     initialized = 1;
-    last_kalman_update_time = 0;  // Sıfırla ki ilk çalıştırmada düzgün başlasın
     flight_start_time = 0;
 }
 
 /**
  * @brief Update sensor fusion with new measurements (Kalman filter)
  */
-void sensor_fusion_update_kalman(BME_280_t* BME, bmi088_struct_t* BMI, sensor_fusion_t* sensor)
+void sensor_fusion_update(BME_280_t* BME, bmi088_struct_t* BMI, sensor_fusion_t* sensor)
 {
     // Get current time for automatic delta calculation
     uint32_t current_time = HAL_GetTick();
@@ -190,40 +229,18 @@ void sensor_fusion_update_kalman(BME_280_t* BME, bmi088_struct_t* BMI, sensor_fu
         return;
     }
 
-
-    float t = DEG2RAD(BMI->datas.theta);
-    // Gravity'in body-z bileşeni
-    float g_b_z = G_CONST * cosf(t);
-
-    // Body-frame gerçek z-ivmesi (yerçekimi çıkarıldı)
-    float a_body_z = BMI->datas.acc_z - g_b_z;
-
-    // İnertial dikey ivme yaklaşık olarak:
-    float accel_z_corrected = (a_body_z * cosf(t))/9.80665;
-
     // İvme sensörü arıza tespiti
-    accel_failure_detected = detect_accel_failure(accel_z_corrected);
+    accel_failure_detected = detect_accel_failure((-BMI->datas.acc_x));
 
-    // İvme değeri kontrolü - aşırı değerleri sınırla
-    if (fabsf(accel_z_corrected) > 500.0f) {
-        accel_z_corrected = (accel_z_corrected > 0) ? 500.0f : -500.0f;
-    }
+    // Yükseklik arıza tespiti
+    altitude_failure_detected = detect_altitude_failure(BME->altitude);
 
-    // Arıza durumuna göre Kalman filtresi parametrelerini güncelle
-    if (accel_failure_detected) {
-        // Arıza tespit edildi - ivme sensörüne çok az güven
-        kalman.measurement_noise_acc = 50.0f;  // Çok yüksek gürültü = düşük güven
-        kalman.measurement_noise_alt = 0.05f;  // BME280 yükseklik gürültüsü (daha realistik)
-    } else {
-        // Normal durum - normal güven
-        kalman.measurement_noise_acc = 0.05f;
-    }
+	// Sadece veri sağlıklıysa filtreyi güncelle
+	if (!accel_failure_detected && !altitude_failure_detected) {
+		baf_step(&filter_1, BME->altitude, (-BMI->datas.acc_x), current_time);
+	}
 
-    baf_step(&filter_1, BME->altitude, accel_z_corrected, time_sec);
-
-	sensor->filtered_altitude = filter_1.h;
-	sensor->apogeeDetect = KalmanFilter_IsApogeeDetected(&kalman);
-	sensor->velocity = filter_1.v; // Kendi hız ölçümünü ata
-	sensor->accel_failure = accel_failure_detected;
-
+    sensor->filtered_altitude = filter_1.h;
+    sensor->velocity = filter_1.v; // Kendi hız ölçümünü ata
+    sensor->accel_failure = accel_failure_detected;
 }

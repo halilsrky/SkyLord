@@ -277,9 +277,9 @@ void bmi088_update(bmi088_struct_t* BMI)
 		int16_t acc_y_16 = (BMI->datas.raw_accel_data[3] << 8) | BMI->datas.raw_accel_data[2];
 		int16_t acc_z_16 = (BMI->datas.raw_accel_data[5] << 8) | BMI->datas.raw_accel_data[4];
 
-		BMI->datas.acc_x = ((float)acc_x_16 / 32768.0 * 1000.0 * 1.5 * pow(2.0, (float)(BMI->device_config.acc_range + 1)) - ACCEL_X_OFFSET)*9.81/1000;
-		BMI->datas.acc_y = ((float)acc_y_16 / 32768.0 * 1000.0 * 1.5 * pow(2.0, (float)(BMI->device_config.acc_range + 1)) - ACCEL_Y_OFFSET)*9.81/1000;
-		BMI->datas.acc_z = ((float)acc_z_16 / 32768.0 * 1000.0 * 1.5 * pow(2.0, (float)(BMI->device_config.acc_range + 1)) - ACCEL_Z_OFFSET)*9.81/1000;
+		BMI->datas.acc_x = ((float)acc_x_16 / 32768.0 * 1000.0 * 1.5 * pow(2.0, (float)(BMI->device_config.acc_range + 1)) - ACCEL_X_OFFSET) * 9.81 / 1000;
+		BMI->datas.acc_y = ((float)acc_y_16 / 32768.0 * 1000.0 * 1.5 * pow(2.0, (float)(BMI->device_config.acc_range + 1)) - ACCEL_Y_OFFSET) * 9.81 / 1000;
+		BMI->datas.acc_z = ((float)acc_z_16 / 32768.0 * 1000.0 * 1.5 * pow(2.0, (float)(BMI->device_config.acc_range + 1)) - ACCEL_Z_OFFSET) * 9.81 / 1000;
 
 		if(is_starded)
 		{
@@ -308,12 +308,13 @@ void bmi088_update(bmi088_struct_t* BMI)
 		BMI->datas.gyro_y = (((float)gyro_y_16 / 32767.0) * (float)(2000 >> BMI->device_config.gyro_range) - BMI->device_config.offsets->gyro_offset[1]) * DEG_TO_RAD;
 		BMI->datas.gyro_z = (((float)gyro_z_16 / 32767.0) * (float)(2000 >> BMI->device_config.gyro_range) - BMI->device_config.offsets->gyro_offset[2]) * DEG_TO_RAD;
 
-		BMI->datas.angle_x += BMI->datas.gyro_x * BMI->datas.delta_time * 180.0 / 3.14159265359; // Convert rad/s to degrees
-		BMI->datas.angle_y += BMI->datas.gyro_y * BMI->datas.delta_time * 180.0 / 3.14159265359;
-		BMI->datas.angle_z += BMI->datas.gyro_z * BMI->datas.delta_time * 180.0 / 3.14159265359;
-
-		Orientation_Update(BMI->datas.gyro_y, -BMI->datas.gyro_x, BMI->datas.gyro_z, BMI->datas.acc_y, -BMI->datas.acc_x, BMI->datas.acc_z, BMI->datas.delta_time);
+		Orientation_Update(BMI->datas.gyro_z, BMI->datas.gyro_y, -BMI->datas.gyro_x, BMI->datas.acc_z, BMI->datas.acc_y, -BMI->datas.acc_x, BMI->datas.delta_time);
 		BMI->datas.theta = quaternionToThetaZ();
+
+		BMI->datas.angle_x = quaternionToYaw(); // normalde acı z
+		BMI->datas.angle_y = quaternionToPitch();
+		BMI->datas.angle_z = quaternionToRoll(); // normalde acı x
+
 		is_gyro_renewed = 1;
 
 		BMI->flags.isGyroDmaComplete = 0;

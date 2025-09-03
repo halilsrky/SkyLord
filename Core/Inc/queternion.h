@@ -24,5 +24,7 @@ float quaternionToYawDegree();
 float quaternionToPitchDegree();
 float quaternionToRollDegree();
 float invSqrt(float x);
+float* getQuaternion(void);
+void setQuaternion(float w, float x, float y, float z);
 
 #endif

@@ -28,9 +28,6 @@
 #include <stdio.h>
 #include <math.h>
 
-/* Project configuration */
-#include "configuration.h"
-
 /* Sensor drivers */
 #include "bme280.h"                    // BME280 barometric pressure sensor
 #include "bmi088.h"                    // BMI088 6-axis IMU sensor
@@ -74,7 +71,7 @@
 #define UART_TX_BUFFER_SIZE            128     // General UART transmit buffer size
 
 /* Flight algorithm parameters */
-#define FLIGHT_ACCEL_THRESHOLD         25.0f   // Acceleration threshold for launch detection (m/s²)
+#define FLIGHT_ACCEL_THRESHOLD         40.0f   // Acceleration threshold for launch detection (m/s²)
 #define FLIGHT_MAX_ALTITUDE            2000.0f // Maximum expected altitude (m)
 #define FLIGHT_MIN_ALTITUDE            500.0f  // Minimum altitude for descent detection (m)
 #define FLIGHT_MAX_VELOCITY            60.0f   // Maximum expected velocity (m/s)
@@ -164,7 +161,6 @@ volatile uint8_t tx_timer_flag_1s = 0;        // Timer-based transmission flag
 volatile uint8_t tx_timer_flag_20s = 0;        // Timer-based transmission flag
 volatile uint8_t usart4_tx_busy = 0;       // UART4 transmission busy flag
 volatile uint8_t usart2_tx_busy = 0;       // UART4 transmission busy flag
-
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -269,9 +265,6 @@ int main(void)
 	// Initialize backup SRAM system
 	backup_sram_init();
 
-
-
-
 	HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
 	HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
 	HAL_Delay(5);
@@ -279,8 +272,14 @@ int main(void)
 	/* ==== RESET DETECTION AND DATA RESTORATION ==== */
 	uint8_t reset_occurred = is_reset_occurred(sTime, sDate);
 
+	// Configure and initialize flight algorithm BEFORE restore (so it can be overwritten)
+	flight_algorithm_set_parameters(FLIGHT_ACCEL_THRESHOLD, FLIGHT_MAX_ALTITUDE, FLIGHT_MIN_ALTITUDE, FLIGHT_MAX_VELOCITY);
+	flight_algorithm_init();
 	
 	if (reset_occurred) {
+		
+		// Initialize UART handler first (before restoring data)
+		uart_handler_init();
 		
 		// Initialize BME280 barometric pressure sensor
 		bme280_begin();
@@ -306,6 +305,9 @@ int main(void)
 		// Normal startup - perform full calibration
 		save_time(sTime, sDate); // Save current time for next reset detection
 		
+		// Initialize UART handler
+		uart_handler_init();
+		
 		/* ==== SENSOR INITIALIZATION ==== */
 		// Initialize BME280 sensor (temperature, humidity, pressure)
 		bme280_begin();
@@ -324,7 +326,7 @@ int main(void)
 	    HAL_Delay(300);
 	    HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin, RESET);
 		setBase();
-
+		BME280_sensor.altitude =  BME280_sensor.altitude - BME280_sensor.base_altitude;
 		// Save static calibration data to backup SRAM (only once at startup)
 		save_static_calibration_data(&BME280_sensor, &BMI_sensor);
 
@@ -332,11 +334,7 @@ int main(void)
 
 	/* ==== SENSOR FUSION AND ALGORITHMS ==== */
 	// Initialize sensor fusion system
-	sensor_fusion_init();
-
-	// Configure and initialize flight algorithm BEFORE restore (so it can be overwritten)
-	flight_algorithm_set_parameters(FLIGHT_ACCEL_THRESHOLD, FLIGHT_MAX_ALTITUDE, FLIGHT_MIN_ALTITUDE, FLIGHT_MAX_VELOCITY);
-	flight_algorithm_init();
+	sensor_fusion_init(BMI_sensor.datas.acc_x);
 
 	/* ==== LORA COMMUNICATION SETUP ==== */
     e22_config_mode(&lora_1);
@@ -346,8 +344,7 @@ int main(void)
 	e22_transmit_mode(&lora_1);
 
 	/* ==== UART AND COMMUNICATION SETUP ==== */
-	// Initialize UART handler for command processing
-	uart_handler_init();
+	// UART handler already initialized above
 
 	// Start UART4 DMA reception for incoming commands
 	HAL_UARTEx_ReceiveToIdle_DMA(&huart4, usart4_rx_buffer, UART_RX_BUFFER_SIZE);
@@ -370,8 +367,6 @@ int main(void)
     HAL_Delay(30);
 	HAL_GPIO_WritePin(CAMERA1_GPIO_Port, CAMERA1_Pin, SET);
     HAL_Delay(30);
-
-    baf_init(&filter_1, 0, 0.3, 0.2, (float)HAL_GetTick());
 
   /* USER CODE END 2 */
 
@@ -405,6 +400,7 @@ int main(void)
 			// Reset flight algorithm state when switching to NORMAL operational mode
 			if (uart_handler_get_mode() == MODE_NORMAL) {
 				flight_algorithm_reset();
+				sensor_fusion_init((-BMI_sensor.datas.acc_x));
 			}
 		}
 
@@ -413,7 +409,7 @@ int main(void)
 		/*PERIODIC OPERATIONS (100ms Timer)*/
 		if (tx_timer_flag_100ms) {
 			tx_timer_flag_100ms = 0;
-			
+
 			// Update GPS/GNSS data for position and velocity tracking
 			//PROFILE_START(PROF_GNSS_UPDATE);
 			L86_GNSS_Update(&gnss_data);
@@ -425,28 +421,6 @@ int main(void)
 			HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
 			
 			save_time(sTime, sDate);
-
-			// DEBUG: Print current and saved time for reset detection debugging
-	/*		uint32_t current_seconds = sTime.Hours * 3600 + sTime.Minutes * 60 + sTime.Seconds + sDate.Date * 86400;
-			HAL_PWR_EnableBkUpAccess();
-			uint32_t saved_seconds = HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR2);
-			uint32_t time_difference = measure_abs_time(sTime, sDate);
-			
-			sprintf(uart_buffer, "DEBUG: Current=%lu Saved=%lu Diff=%lu Reset=%d\r\n", 
-					current_seconds, saved_seconds, time_difference, is_reset_occurred(sTime, sDate));
-			HAL_UART_Transmit(&huart1, (uint8_t*)uart_buffer, strlen(uart_buffer), 100);
-
-			// Read backup SRAM data
-			backup_sram_data_t* backup_data = (backup_sram_data_t*)BACKUP_SRAM_DATA_ADDRESS;
-			
-			HAL_UART_Transmit(&huart1, (uint8_t*)uart_buffer, strlen(uart_buffer), 100);
-			
-			sprintf(uart_buffer, "SRAM Magic: 0x%08lX Timestamp: %lu BaseAlt: %.6f\r\n",
-					backup_data->magic_number,
-					backup_data->last_save_timestamp,
-					backup_data->bmi_offsets.gyro_offset[1]);
-			HAL_UART_Transmit(&huart1, (uint8_t*)uart_buffer, strlen(uart_buffer), 100);*/
-			
 
 			// Check high-speed data acquisition status
 			HSD_StatusCheck();
@@ -467,7 +441,7 @@ int main(void)
 
 					// Enhanced sensor fusion using Kalman filter for precise state estimation
 					//PROFILE_START(PROF_SENSOR_FUSION);
-					sensor_fusion_update_kalman(&BME280_sensor, &BMI_sensor, &sensor_output);
+					sensor_fusion_update(&BME280_sensor, &BMI_sensor, &sensor_output);
 					//PROFILE_END(PROF_SENSOR_FUSION);
 
 					// Execute flight algorithm for launch detection, apogee detection, and recovery deployment
@@ -484,20 +458,25 @@ int main(void)
 					addDataPacketSD(&BME280_sensor, &BMI_sensor, &gnss_data, &sensor_output, voltage_V, current_mA);
 
 
-					//HAL_UART_Transmit(&huart1, (uint8_t*)normal_paket, 62, 100);
+					HAL_UART_Transmit(&huart1, (uint8_t*)normal_paket, 62, 100);
 
 
 					//PROFILE_START(PROF_SD_LOGGER);
 					log_normal_packet_data(sd_paket, "skylord.bin");
 					//PROFILE_END(PROF_SD_LOGGER);
+					// Save only dynamic flight data to backup SRAM every 10 seconds
+					//PROFILE_START(PROF_FLASH);
+					//W25Q_WriteToBufferFlushOnSectorFull(sd_paket);
+					//PROFILE_END(PROF_FLASH);
+
+					//dwt_profiler_print_compact();
 
 					//PROFILE_START(PROF_FLASH);
-					W25Q_WriteToBufferFlushOnSectorFull(sd_paket);
+					//W25Q_WriteToBufferFlushOnSectorFull(sd_paket);
 					//PROFILE_END(PROF_FLASH);
 
 					//HAL_UART_Transmit(&huart1, (uint8_t*)normal_paket, 62, 100);
 
-					//dwt_profiler_print_compact();
 
 					/* Optional real-time telemetry transmission (disabled to reduce latency) */
 					//uint16_t status_bits = flight_algorithm_get_status_bits();
@@ -524,11 +503,7 @@ int main(void)
 		if(tx_timer_flag_1s >= 10){
 			tx_timer_flag_1s = 0;
 			lora_send_packet_dma((uint8_t*)normal_paket, 62);
-			
-			// Save only dynamic flight data to backup SRAM every 10 seconds
 			save_flight_data_to_backup_sram();
-			
-
 		}
 
 	}

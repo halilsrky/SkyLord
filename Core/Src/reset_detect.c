@@ -7,6 +7,7 @@
 
 #include "reset_detect.h"
 #include "string.h"
+#include "math.h"
 
 // Global backup SRAM data pointer
 static backup_sram_data_t* backup_data = (backup_sram_data_t*)BACKUP_SRAM_DATA_ADDRESS;
@@ -133,7 +134,7 @@ uint8_t restore_critical_data_from_backup_sram(BME_280_t* bme, bmi088_struct_t* 
         // Invalid base altitude, set to safe default
         bme->base_altitude = 0.0f;
     }
-    
+
     return 1; // Success
 }
 
@@ -147,6 +148,36 @@ void save_flight_data_to_backup_sram(void)
     backup_data->flight_data.status_bits = flight_algorithm_get_status_bits();
     backup_data->flight_data.durum_verisi = flight_algorithm_get_durum_verisi();
     backup_data->flight_data.flight_start_time = flight_algorithm_get_start_time();
+    
+    // Save all additional flight algorithm state variables
+    backup_data->flight_data.is_rising = flight_algorithm_get_is_rising();
+    backup_data->flight_data.is_stabilized = flight_algorithm_get_is_stabilized();
+    backup_data->flight_data.is_armed = flight_algorithm_get_is_armed();
+    backup_data->flight_data.drogue_deployed = flight_algorithm_get_drogue_deployed();
+    backup_data->flight_data.main_deployed = flight_algorithm_get_main_deployed();
+    backup_data->flight_data.deployed_angle = flight_algorithm_get_deployed_angle();
+    backup_data->flight_data.deployed_velocity = flight_algorithm_get_deployed_velocity();
+    backup_data->flight_data.apogee_counter = flight_algorithm_get_apogee_counter();
+    backup_data->flight_data.burnout_counter = flight_algorithm_get_burnout_counter();
+    backup_data->flight_data.prev_velocity = flight_algorithm_get_prev_velocity();
+    backup_data->flight_data.altitude_decrease_count = flight_algorithm_get_altitude_decrease_count();
+    backup_data->flight_data.prev_altitude = flight_algorithm_get_prev_altitude();
+    backup_data->flight_data.drogue_pulse_active = flight_algorithm_get_drogue_pulse_active();
+    backup_data->flight_data.drogue_pulse_start_time = flight_algorithm_get_drogue_pulse_start_time();
+    backup_data->flight_data.main_pulse_active = flight_algorithm_get_main_pulse_active();
+    backup_data->flight_data.main_pulse_start_time = flight_algorithm_get_main_pulse_start_time();
+
+    // Save latest quaternion values
+    float* current_quaternion = getQuaternion();
+    if (current_quaternion != NULL) {
+        backup_data->flight_data.quaternion[0] = current_quaternion[0];  // w
+        backup_data->flight_data.quaternion[1] = current_quaternion[1];  // x
+        backup_data->flight_data.quaternion[2] = current_quaternion[2];  // y
+        backup_data->flight_data.quaternion[3] = current_quaternion[3];  // z
+    }
+    
+    // Save current test mode
+    backup_data->flight_data.test_mode = uart_handler_get_mode();
     
     // Update timestamp
     backup_data->last_save_timestamp = HAL_GetTick();
@@ -163,13 +194,49 @@ uint8_t restore_flight_data_from_backup_sram(void)
         return 0; // Invalid data
     }
     
-    // Restore flight algorithm state using the restore function
-    flight_algorithm_restore_state(
+    // Restore complete flight algorithm state using the new restore function
+    flight_algorithm_restore_complete_state(
         backup_data->flight_data.current_phase,
         backup_data->flight_data.status_bits,
         backup_data->flight_data.durum_verisi,
-        backup_data->flight_data.flight_start_time
+        backup_data->flight_data.flight_start_time,
+        backup_data->flight_data.is_rising,
+        backup_data->flight_data.is_stabilized,
+        backup_data->flight_data.is_armed,
+        backup_data->flight_data.drogue_deployed,
+        backup_data->flight_data.main_deployed,
+        backup_data->flight_data.deployed_angle,
+        backup_data->flight_data.deployed_velocity,
+        backup_data->flight_data.apogee_counter,
+        backup_data->flight_data.burnout_counter,
+        backup_data->flight_data.prev_velocity,
+        backup_data->flight_data.altitude_decrease_count,
+        backup_data->flight_data.prev_altitude,
+        backup_data->flight_data.drogue_pulse_active,
+        backup_data->flight_data.drogue_pulse_start_time,
+        backup_data->flight_data.main_pulse_active,
+        backup_data->flight_data.main_pulse_start_time
     );
     
+    // Restore quaternion values if valid
+    float quat_magnitude = sqrtf(
+        backup_data->flight_data.quaternion[0] * backup_data->flight_data.quaternion[0] +
+        backup_data->flight_data.quaternion[1] * backup_data->flight_data.quaternion[1] +
+        backup_data->flight_data.quaternion[2] * backup_data->flight_data.quaternion[2] +
+        backup_data->flight_data.quaternion[3] * backup_data->flight_data.quaternion[3]
+    );
+    
+    // Check if quaternion is valid (magnitude should be close to 1.0)
+    if (quat_magnitude > 0.9f && quat_magnitude < 1.1f) {
+        setQuaternion(
+            backup_data->flight_data.quaternion[0],
+            backup_data->flight_data.quaternion[1],
+            backup_data->flight_data.quaternion[2],
+            backup_data->flight_data.quaternion[3]
+        );
+    }
+    
+    set_current_mode(backup_data->flight_data.test_mode);
+
     return 1; // Success
 }
