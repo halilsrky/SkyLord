@@ -2,6 +2,9 @@
 
 **SkyLord**, model roket ve İHA uygulamaları için geliştirilmiş profesyonel bir uçuş bilgisayarı sistemidir. STM32F446RET6 mikrodenetleyici tabanlı bu sistem, gelişmiş sensör füzyonu algoritmaları, gerçek zamanlı veri kaydı ve kablosuz telemetri özellikleri sunar.
 
+![Zlink88](https://github.com/user-attachments/assets/6f41cb7d-4e2b-48e0-b7b9-aa0fc39d0f60)
+
+
 ---
 
 ## 📋 İçindekiler
