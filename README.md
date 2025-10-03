@@ -410,22 +410,13 @@ Katkılarınızı bekliyoruz! Lütfen aşağıdaki adımları izleyin:
 
 ---
 
-## 📜 Lisans
-
-Bu proje açık kaynak yazılım değildir. Tüm hakları saklıdır.
-
-**Copyright © 2025 Halil Sarıkaya**
-
-*Ticari kullanım, dağıtım ve türev eserler için izin gereklidir.*
-
----
-
 ## 📞 İletişim
 
 **Proje Sahibi**: Halil Sarıkaya
 
 - GitHub: [@halilsrky](https://github.com/halilsrky)
-- E-posta: [iletişim bilgilerinizi buraya ekleyebilirsiniz]
+- E-posta: halilsarikaya070@gmail.com
+- LinkedIn: www.linkedin.com/in/halil-sarıkaya-3a777321b
 
 ---
 
@@ -446,12 +437,6 @@ Bu projenin geliştirilmesinde kullanılan açık kaynak kütüphaneler:
 **Durum**: 🟢 Aktif Geliştirme  
 **Son Güncelleme**: 03 Ekim 2025
 
-### Yapılacaklar (Roadmap)
-- [ ] Çift paraşüt ayırma algoritması
-- [ ] Real-time grafik arayüzü (Python)
-- [ ] OTA firmware güncelleme
-- [ ] Çoklu roket senkronizasyonu
-- [ ] Machine learning ile apoji tahmini
 
 ---
 
