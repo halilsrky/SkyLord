@@ -25,6 +25,8 @@
 
 ---
 
+![ZLink55](https://github.com/user-attachments/assets/2065dcf8-8668-46a6-8ab4-cea2bcc864cb)
+
 ## ✨ Özellikler
 
 ### 🎯 Temel Özellikler
