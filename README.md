@@ -101,13 +101,29 @@ SkyLord/
 │   │   ├── packet.c               # Telemetri paket yönetimi
 │   │   ├── data_logger.c          # SD kart veri kaydı
 │   │   ├── reset_detect.c         # Reset algılama ve kurtarma
-│   │   └── test_modes.c           # Test modları
+│   │   ├── test_modes.c           # Test modları
+│   │   ├── bme280.c               # BME280 sürücü implementasyonu
+│   │   ├── bmi088.c               # BMI088 sürücü implementasyonu
+│   │   ├── e22_lib.c              # LoRa modül implementasyonu
+│   │   ├── l86_gnss.c             # GPS modül implementasyonu
+│   │   ├── queternion.c           # Quaternion matematik implementasyonu
+│   │   ├── filter.c               # Filtre implementasyonları
+│   │   └── kalman.c               # Kalman filtre implementasyonu
 │   └── Inc/
 │       ├── bme280.h               # BME280 sürücü başlığı
 │       ├── bmi088.h               # BMI088 sürücü başlığı
 │       ├── e22_lib.h              # LoRa modül başlığı
 │       ├── l86_gnss.h             # GPS modül başlığı
-│       └── quaternion.h           # Quaternion matematik
+│       ├── queternion.h           # Quaternion matematik başlığı
+│       ├── sensor_fusion.h        # Sensör füzyon başlığı
+│       ├── flight_algorithm.h     # Uçuş algoritması başlığı
+│       ├── uart_handler.h         # UART komut işleme başlığı
+│       ├── packet.h               # Telemetri paket başlığı
+│       ├── data_logger.h          # Veri kayıt başlığı
+│       ├── reset_detect.h         # Reset algılama başlığı
+│       ├── test_modes.h           # Test modları başlığı
+│       ├── filter.h               # Filtre başlığı
+│       └── kalman.h               # Kalman filtre başlığı
 ├── Drivers/                        # STM32 HAL sürücüleri
 ├── FATFS/                          # FAT dosya sistemi
 └── Middlewares/                    # USB ve ek kütüphaneler
