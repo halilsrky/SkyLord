@@ -420,16 +420,6 @@ Katkılarınızı bekliyoruz! Lütfen aşağıdaki adımları izleyin:
 
 ---
 
-## 🙏 Teşekkürler
-
-Bu projenin geliştirilmesinde kullanılan açık kaynak kütüphaneler:
-
-- **STM32 HAL Library** - STMicroelectronics
-- **FatFs** - ChaN
-- **BMI088 Driver** - Bosch Sensortec
-- **BME280 Driver** - Bosch Sensortec
-
----
 
 ## 📈 Proje Durumu
 
