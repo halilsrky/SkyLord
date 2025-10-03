@@ -329,8 +329,8 @@ SkyLord üç farklı çalışma modunu destekler:
 | 36-39 | Jiroskop X | float | °/s | BMI088 |
 | 40-43 | Jiroskop Y | float | °/s | BMI088 |
 | 44-47 | Jiroskop Z | float | °/s | BMI088 |
-| 48-51 | Quaternion Q0 | float | - | Oryantasyon |
-| 52-55 | Pil Voltajı | float | V | ADC1 |
+| 48-51 | Angle | float | ° | Oryantasyon |
+| 52-55 | Voltaj | float | V | ADC1 |
 | 56-59 | Sıcaklık | float | °C | BME280 |
 | 60 | Uçuş Fazı | uint8_t | - | 0-5 arası |
 | 61 | CRC | uint8_t | - | Paket doğrulama |
