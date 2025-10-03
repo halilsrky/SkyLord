@@ -411,22 +411,6 @@ Normal pakete ek olarak:
 
 ---
 
-## 🤝 Katkıda Bulunma
-
-Katkılarınızı bekliyoruz! Lütfen aşağıdaki adımları izleyin:
-
-1. Bu repoyu fork edin
-2. Yeni bir branch oluşturun (`git checkout -b feature/amazing-feature`)
-3. Değişikliklerinizi commit edin (`git commit -m 'feat: Add amazing feature'`)
-4. Branch'inizi push edin (`git push origin feature/amazing-feature`)
-5. Pull Request oluşturun
-
-### Kod Standartları
-- Fonksiyonlar İngilizce isimlendirme
-- Yorumlar Türkçe veya İngilizce olabilir
-- Doxygen formatında dokümantasyon
-
----
 
 ## 📞 İletişim
 
