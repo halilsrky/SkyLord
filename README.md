@@ -189,8 +189,7 @@ Ana Döngü (sürekli):
 ### GPIO Pinleri
 | Pin | İşlev | Açıklama |
 |-----|-------|----------|
-| PC13 | CAMERA | Kamera tetik 1 |
-| PC14 | CAMERA1 | Kamera tetik 2 |
+| PC13 | CAMERA | Kamera tetik |
 | PA11 | KURTARMA1 | Paraşüt ayırıcı 1 |
 | PA15 | KURTARMA2 | Paraşüt ayırıcı 2 |
 | PB0 | BUZZER | Sesli uyarı |
