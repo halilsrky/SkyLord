@@ -1,442 +1,436 @@
-# 🚀 SkyLord - Uçuş Bilgisayarı
+# 🚀 SkyLord - Flight Computer
 
-**SkyLord**, Aeronis Aerospace takımı olarak katıldığımız Teknofest Orta İrtifa Roket Yarışmasında kullandığımız model roket için geliştirilmiş bir uçuş bilgisayarı sistemidir. STM32F446RET6 mikrodenetleyici tabanlı bu sistem, gelişmiş sensör füzyonu algoritmaları, gerçek zamanlı veri kaydı ve kablosuz telemetri özellikleri sunar.
+**SkyLord** is a flight computer system developed for the model rocket we used in the Teknofest Mid-Altitude Rocket Competition as the Aeronis Aerospace team. [...]
 
 ![Zlink88](https://github.com/user-attachments/assets/6f41cb7d-4e2b-48e0-b7b9-aa0fc39d0f60)
 
-
 ---
 
-## 📋 İçindekiler
+## 📋 Table of Contents
 
-- [Özellikler](#-özellikler)
-- [Donanım Özellikleri](#️-donanım-özellikleri)
-- [Yazılım Mimarisi](#-yazılım-mimarisi)
-- [Kullanılan Sensörler ve Modüller](#-kullanılan-sensörler-ve-modüller)
-- [Kurulum](#-kurulum)
-- [Derleme ve Yükleme](#️-derleme-ve-yükleme)
-- [Sistem Modları](#-sistem-modları)
-- [Uçuş Algoritmaları](#-uçuş-algoritmaları)
-- [Pin Konfigürasyonu](#-pin-konfigürasyonu)
-- [Telemetri Paketi](#-telemetri-paketi)
-- [Katkıda Bulunma](#-katkıda-bulunma)
-- [Lisans](#-lisans)
-- [İletişim](#-iletişim)
+- [Features](#-features)
+- [Hardware Specifications](#️-hardware-specifications)
+- [Software Architecture](#-software-architecture)
+- [Sensors and Modules Used](#-sensors-and-modules-used)
+- [Setup](#-setup)
+- [Build and Flash](#️-build-and-flash)
+- [System Modes](#-system-modes)
+- [Flight Algorithms](#-flight-algorithms)
+- [Pin Configuration](#-pin-configuration)
+- [Telemetry Packet](#-telemetry-packet)
+- [Contributing](#-contributing)
+- [License](#-license)
+- [Contact](#-contact)
 
 ---
 
 ![ZLink55](https://github.com/user-attachments/assets/2065dcf8-8668-46a6-8ab4-cea2bcc864cb)
 
-## ✨ Özellikler
+## ✨ Features
 
-### 🎯 Temel Özellikler
-- ✅ **Gerçek Zamanlı Uçuş Takibi**: 10ms periyot ile yüksek frekanslı veri toplama
-- ✅ **Gelişmiş Sensör Füzyonu**: Mahony ve Kalman filtre algoritmaları
-- ✅ **Uçuş Fazı Tespiti**: Fırlatma, yükselme, apoji, iniş fazlarının otomatik tespiti
-- ✅ **LoRa Telemetri**: Uzun menzilli kablosuz veri iletimi (1+ km)
-- ✅ **GPS Entegrasyonu**: L86 GNSS modülü ile konum takibi
-- ✅ **SD Kart Veri Kaydı**: FAT dosya sistemi ile yüksek hızlı veri loglama
-- ✅ **Reset Koruması**: Backup SRAM ile kritik verilerin korunması
-- ✅ **Çoklu Test Modu**: SIT (Sistem Entegrasyon Testi) ve SUT (Algoritma Doğrulama)
-- ✅ **Enerji Yönetimi**: Düşük voltaj algılama ve güç tasarrufu modu
-- ✅ **Kurtarma Sistemi Kontrolü**: Otomatik paraşüt açma desteği
+### 🎯 Core Features
+- ✅ **Real-Time Flight Tracking**: High-frequency data acquisition with a 10 ms period
+- ✅ **Advanced Sensor Fusion**: Mahony and Kalman filter algorithms
+- ✅ **Flight Phase Detection**: Automatic detection of launch, ascent, apogee, and landing phases
+- ✅ **LoRa Telemetry**: Long-range wireless data transmission (1+ km)
+- ✅ **GPS Integration**: Position tracking with the L86 GNSS module
+- ✅ **SD Card Data Logging**: High-speed logging using FAT filesystem
+- ✅ **Reset Protection**: Critical data preserved using Backup SRAM
+- ✅ **Multiple Test Modes**: SIT (System Integration Test) and SUT (Algorithm Validation)
+- ✅ **Power Management**: Low-voltage detection and power-saving modes
+- ✅ **Recovery System Control**: Support for automatic parachute deployment
 
-### 🔬 Sensör Yetenekleri
-- **6-Eksen IMU**: ±24g ivme, ±2000°/s dönüş hızı
-- **Barometrik Yükseklik**: ±0.5m hassasiyet
-- **Quaternion Tabanlı Oryantasyon**: Gimbal lock'tan korunma
-- **Otomatik Kalibrasyon**: Başlangıç offseti ve baz yükseklik ayarı
-
----
-
-## 🛠️ Donanım Özellikleri
-
-### Ana İşlemci
-- **MCU**: STM32F446RET6 (ARM Cortex-M4F @ 180MHz)
-- **Flash**: 512KB
-- **RAM**: 128KB
-- **Backup SRAM**: 4KB (kritik veri koruması için)
-
-### Çevre Birimleri
-| Çevre Birimi | Adet | Kullanım Amacı |
-|--------------|------|----------------|
-| I2C          | 2    | Sensör iletişimi (BME280, BMI088) |
-| UART         | 4    | GPS, LoRa, Telemetri, Debug |
-| SPI          | 2    | SD Kart, W25Q Flash |
-| ADC          | 2    | Pil voltajı ve akım ölçümü |
-| Timer        | 1    | 10ms periyodik kesme |
-| DMA          | 5    | Yüksek hızlı veri transferi |
-| RTC          | 1    | Zaman damgalama |
+### 🔬 Sensor Capabilities
+- **6-Axis IMU**: ±24g acceleration, ±2000°/s gyroscope range
+- **Barometric Altitude**: ±0.5 m accuracy
+- **Quaternion-Based Orientation**: Avoids gimbal lock
+- **Automatic Calibration**: Initial offsets and base altitude setup
 
 ---
 
-## 📦 Kullanılan Sensörler ve Modüller
+## 🛠️ Hardware Specifications
 
-### Sensörler
-| Sensör | Model | İletişim | Amaç |
-|--------|-------|----------|------|
-| **IMU** | BMI088 | I2C (DMA) | 6-eksen ivme ve jiroskop |
-| **Barometrik Sensör** | BME280 | I2C | Basınç, sıcaklık, nem, yükseklik |
-| **GPS** | L86 GNSS | UART5 (DMA) | Konum, hız, zaman |
+### Main Processor
+- **MCU**: STM32F446RET6 (ARM Cortex-M4F @ 180 MHz)
+- **Flash**: 512 KB
+- **RAM**: 128 KB
+- **Backup SRAM**: 4 KB (for preserving critical data)
 
-### Haberleşme Modülleri
-| Modül | Model | İletişim | Menzil |
-|-------|-------|----------|--------|
+### Peripherals
+| Peripheral | Count | Purpose |
+|------------|-------|---------|
+| I2C        | 2     | Sensor communication (BME280, BMI088) |
+| UART       | 4     | GPS, LoRa, Telemetry, Debug |
+| SPI        | 2     | SD Card, W25Q Flash |
+| ADC        | 2     | Battery voltage and current measurement |
+| Timer      | 1     | 10 ms periodic interrupt |
+| DMA        | 5     | High-speed data transfer |
+| RTC        | 1     | Timestamping |
+
+---
+
+## 📦 Sensors and Modules Used
+
+### Sensors
+| Sensor | Model | Interface | Purpose |
+|--------|-------|-----------|---------|
+| **IMU** | BMI088 | I2C (DMA) | 6-axis accelerometer and gyroscope |
+| **Barometric Sensor** | BME280 | I2C | Pressure, temperature, humidity, altitude |
+| **GPS** | L86 GNSS | UART5 (DMA) | Position, velocity, time |
+
+### Communication Modules
+| Module | Model | Interface | Range |
+|--------|-------|-----------|-------|
 | **LoRa** | E22-900T22S | UART2 (115200 baud) | 1+ km |
-| **Debug UART** | - | UART4 (115200 baud) | Kablolu |
+| **Debug UART** | - | UART4 (115200 baud) | Wired debug |
 
-### Depolama
-- **SD Kart**: FAT dosya sistemi, yüksek hızlı loglama
-- **W25Q Flash**: Ek veri saklama (SPI)
+### Storage
+- **SD Card**: FAT filesystem, high-speed logging
+- **W25Q Flash**: Additional data storage (SPI)
 
 ---
 
-## 🏗️ Yazılım Mimarisi
+## 🏗️ Software Architecture
 
-### Modül Yapısı
+### Module Structure
 
 ```
 SkyLord/
 ├── Core/
 │   ├── Src/
-│   │   ├── main.c                 # Ana program döngüsü
-│   │   ├── sensor_fusion.c        # Mahony/Kalman filtre algoritmaları
-│   │   ├── flight_algorithm.c     # Uçuş fazı tespiti
-│   │   ├── uart_handler.c         # Komut işleme
-│   │   ├── packet.c               # Telemetri paket yönetimi
-│   │   ├── data_logger.c          # SD kart veri kaydı
-│   │   ├── reset_detect.c         # Reset algılama ve kurtarma
-│   │   └── test_modes.c           # Test modları
-│   │   ├── test_modes.c           # Test modları
-│   │   ├── bme280.c               # BME280 sürücü implementasyonu
-│   │   ├── bmi088.c               # BMI088 sürücü implementasyonu
-│   │   ├── e22_lib.c              # LoRa modül implementasyonu
-│   │   ├── l86_gnss.c             # GPS modül implementasyonu
-│   │   ├── queternion.c           # Quaternion matematik implementasyonu
-│   │   ├── filter.c               # Filtre implementasyonları
-│   │   └── kalman.c               # Kalman filtre implementasyonu
+│   │   ├── main.c                 # Main program loop
+│   │   ├── sensor_fusion.c        # Mahony/Kalman filter algorithms
+│   │   ├── flight_algorithm.c     # Flight phase detection
+│   │   ├── uart_handler.c         # Command handling
+│   │   ├── packet.c               # Telemetry packet management
+│   │   ├── data_logger.c          # SD card data logging
+│   │   ├── reset_detect.c         # Reset detection and recovery
+│   │   └── test_modes.c           # Test modes
+│   │   ├── bme280.c               # BME280 driver implementation
+│   │   ├── bmi088.c               # BMI088 driver implementation
+│   │   ├── e22_lib.c              # LoRa module implementation
+│   │   ├── l86_gnss.c             # GPS module implementation
+│   │   ├── quaternion.c           # Quaternion math implementation
+│   │   ├── filter.c               # Filter implementations
+│   │   └── kalman.c               # Kalman filter implementation
 │   └── Inc/
-│       ├── bme280.h               # BME280 sürücü başlığı
-│       ├── bmi088.h               # BMI088 sürücü başlığı
-│       ├── e22_lib.h              # LoRa modül başlığı
-│       ├── l86_gnss.h             # GPS modül başlığı
-│       └── quaternion.h           # Quaternion matematik
-│       ├── queternion.h           # Quaternion matematik başlığı
-│       ├── sensor_fusion.h        # Sensör füzyon başlığı
-│       ├── flight_algorithm.h     # Uçuş algoritması başlığı
-│       ├── uart_handler.h         # UART komut işleme başlığı
-│       ├── packet.h               # Telemetri paket başlığı
-│       ├── data_logger.h          # Veri kayıt başlığı
-│       ├── reset_detect.h         # Reset algılama başlığı
-│       ├── test_modes.h           # Test modları başlığı
-│       ├── filter.h               # Filtre başlığı
-│       └── kalman.h               # Kalman filtre başlığı
-├── Drivers/                        # STM32 HAL sürücüleri
-├── FATFS/                          # FAT dosya sistemi
-└── Middlewares/                    # USB ve ek kütüphaneler
+│       ├── bme280.h               # BME280 driver header
+│       ├── bmi088.h               # BMI088 driver header
+│       ├── e22_lib.h              # LoRa module header
+│       ├── l86_gnss.h             # GPS module header
+│       └── quaternion.h           # Quaternion math
+│       ├── sensor_fusion.h        # Sensor fusion header
+│       ├── flight_algorithm.h     # Flight algorithm header
+│       ├── uart_handler.h         # UART command handler header
+│       ├── packet.h               # Telemetry packet header
+│       ├── data_logger.h          # Data logger header
+│       ├── reset_detect.h         # Reset detection header
+│       ├── test_modes.h           # Test modes header
+│       ├── filter.h               # Filter header
+│       └── kalman.h               # Kalman filter header
+├── Drivers/                        # STM32 HAL drivers
+├── FATFS/                          # FAT filesystem middleware
+└── Middlewares/                    # USB and additional libraries
 ```
 
-### Çalışma Döngüsü
+### Main Loop
 
 ```
-Ana Döngü (sürekli):
-├── IMU Güncelleme (BMI088)
-├── Barometrik Sensör Güncelleme (BME280)
-├── UART Komut İşleme
-└── 100ms Timer Kesmesi:
-    ├── GPS Güncelleme
-    ├── Mod-Bazlı İşlemler:
-    │   ├── NORMAL: Sensör füzyonu + Uçuş algoritması + Loglama
-    │   ├── SIT: Sensör entegrasyon testleri
-    │   └── SUT: Algoritma doğrulama (sentetik veri)
-    ├── ADC Okuma (voltaj/akım)
-    └── Durum LED'leri güncelleme
+Main Loop (continuous):
+├── IMU Update (BMI088)
+├── Barometric Sensor Update (BME280)
+├── UART Command Handling
+└── 100 ms Timer Interrupt:
+    ├── GPS Update
+    ├── Mode-Based Tasks:
+    │   ├── NORMAL: Sensor fusion + Flight algorithm + Logging
+    │   ├── SIT: Sensor integration tests
+    │   └── SUT: Algorithm validation (synthetic data)
+    ├── ADC Readings (voltage/current)
+    └── Status LEDs update
 
-1 Saniye Timer:
-└── LoRa Telemetri İletimi + Backup SRAM Kayıt
+1 Second Timer:
+└── LoRa Telemetry Transmission + Backup SRAM Save
 ```
 
 ---
 
-## 🚀 Uçuş Algoritmaları
+## 🚀 Flight Algorithms
 
-### 1. Sensör Füzyonu
-- **Mahony Filtresi**: IMU ve barometrik verileri birleştirir
-- **Kalman Filtresi**: Yükseklik ve hız tahmini için optimal tahmin
-- **Quaternion Matematiği**: Gimbal lock'sız 3D oryantasyon
+### 1. Sensor Fusion
+- **Mahony Filter**: Combines IMU and barometric data
+- **Kalman Filter**: Optimal estimation for altitude and velocity
+- **Quaternion Math**: 3D orientation without gimbal lock
 
-### 2. Uçuş Fazı Tespiti
-| Faz | Algılama Kriteri | Aksiyon |
-|-----|------------------|---------|
-| **Bekleme** | İvme < 40 m/s² | Baz yükseklik ayarı |
-| **Fırlatma** | İvme > 40 m/s² | Veri kaydı başlat |
-| **Yükselme** | Hız > 0, İvme pozitif | Maksimum yükseklik izle |
-| **Apoji** | Hız ≈ 0 | Kurtarma sistemi tetikleme (opsiyonel) |
-| **İniş** | Hız < 0, Yükseklik azalıyor | İniş hızı izle |
-| **Zemin** | Yükseklik ≈ baz yükseklik | Loglama durdur |
+### 2. Flight Phase Detection
+| Phase | Detection Criteria | Action |
+|-------|--------------------|--------|
+| **Idle** | Acceleration < 40 m/s² | Base altitude setup |
+| **Launch** | Acceleration > 40 m/s² | Start data logging |
+| **Ascent** | Velocity > 0, positive acceleration | Track max altitude |
+| **Apogee** | Velocity ≈ 0 | Trigger recovery system (optional) |
+| **Descent** | Velocity < 0, altitude decreasing | Monitor descent rate |
+| **Ground** | Altitude ≈ base altitude | Stop logging |
 
-### 3. Reset Koruması
-- RTC zaman damgası ile reset algılama
-- Backup SRAM'e kritik veri kaydetme:
-  - Sensör kalibrasyon verileri
-  - Baz yükseklik
-  - Uçuş fazı durumu
-  - IMU offset değerleri
+### 3. Reset Protection
+- Reset detection using RTC timestamps
+- Save critical data to Backup SRAM:
+  - Sensor calibration data
+  - Base altitude
+  - Flight phase state
+  - IMU offset values
 
 ---
 
-## 🔌 Pin Konfigürasyonu
+## 🔌 Pin Configuration
 
-### I2C Pinleri
-| Pin | İşlev | Sensör |
-|-----|-------|--------|
+### I2C Pins
+| Pin | Function | Sensor |
+|-----|----------|--------|
 | PB8 | I2C1_SCL | BME280 |
 | PB9 | I2C1_SDA | BME280 |
 | PA8 | I2C3_SCL | BMI088 |
 | PC9 | I2C3_SDA | BMI088 |
 
-### UART Pinleri
-| UART | TX | RX | Kullanım |
-|------|----|----|----------|
-| UART4 | PA0 | PA1 | Debug/Komut |
+### UART Pins
+| UART | TX | RX | Use |
+|------|----|----|-----|
+| UART4 | PA0 | PA1 | Debug/Command |
 | UART5 | PC12 | PD2 | GPS (L86) |
-| USART1 | PA9 | PA10 | Telemetri çıkışı |
+| USART1 | PA9 | PA10 | Telemetry output |
 | USART2 | PA2 | PA3 | LoRa (E22) |
 
-### SPI Pinleri
-| SPI | SCK | MISO | MOSI | CS | Kullanım |
-|-----|-----|------|------|----|----------|
-| SPI1 | PA5 | PA6 | PA7 | PA4 | SD Kart |
+### SPI Pins
+| SPI | SCK | MISO | MOSI | CS | Use |
+|-----|-----|------|------|----|-----|
+| SPI1 | PA5 | PA6 | PA7 | PA4 | SD Card |
 | SPI2 | PB13 | PB14 | PB15 | PB12 | W25Q Flash |
 
-### GPIO Pinleri
-| Pin | İşlev | Açıklama |
-|-----|-------|----------|
-| PC13 | CAMERA | Kamera tetik |
-| PA11 | KURTARMA1 | Paraşüt ayırıcı 1 |
-| PA15 | KURTARMA2 | Paraşüt ayırıcı 2 |
-| PB0 | BUZZER | Sesli uyarı |
-| PB10 | SGU_LED1 | Durum LED 1 |
-| PB11 | SGU_LED2 | Durum LED 2 |
-| PC8 | MCU_LED | MCU çalışma göstergesi |
+### GPIO Pins
+| Pin | Function | Description |
+|-----|----------|-------------|
+| PC13 | CAMERA | Camera trigger |
+| PA11 | RECOVERY1 | Parachute separation 1 |
+| PA15 | RECOVERY2 | Parachute separation 2 |
+| PB0 | BUZZER | Audible alert |
+| PB10 | SGU_LED1 | Status LED 1 |
+| PB11 | SGU_LED2 | Status LED 2 |
+| PC8 | MCU_LED | MCU activity indicator |
 
-### ADC Pinleri
-| ADC | Kanal | Pin | Ölçüm |
-|-----|-------|-----|-------|
-| ADC1 | CH9 | PB1 | Pil voltajı (0-13.2V) |
-| ADC2 | CH8 | PB0 | Akım sensörü |
+### ADC Pins
+| ADC | Channel | Pin | Measurement |
+|-----|---------|-----|-------------|
+| ADC1 | CH9 | PB1 | Battery voltage (0-13.2V) |
+| ADC2 | CH8 | PB0 | Current sensor |
 
 ---
 
-## 💻 Kurulum
+## 💻 Setup
 
-### Gereksinimler
+### Requirements
 
-#### Yazılım
-- **STM32CubeIDE** v1.8.0 veya üzeri
-- **STM32CubeMX** (opsiyonel, proje zaten yapılandırılmış)
-- **ST-Link Utility** veya **OpenOCD** (firmware yükleme için)
+#### Software
+- **STM32CubeIDE** v1.8.0 or later
+- **STM32CubeMX** (optional — project is preconfigured)
+- **ST-Link Utility** or **OpenOCD** (for flashing firmware)
 
-#### Donanım
-- ST-Link V2 programlayıcı
-- USB-UART dönüştürücü (debug için)
-- STM32F446RET6 geliştirme kartı veya özel PCB
+#### Hardware
+- ST-Link V2 programmer
+- USB-UART adapter (for debug)
+- STM32F446RET6 development board or custom PCB
 
-### Adımlar
+### Steps
 
-1. **Repoyu Klonlayın**
+1. **Clone the repository**
 ```bash
 git clone https://github.com/halilsrky/SkyLord.git
 cd SkyLord
 ```
 
-2. **STM32CubeIDE'de Açın**
-   - `File` → `Open Projects from File System`
-   - Proje klasörünü seçin
-   - `Finish` butonuna tıklayın
+2. **Open in STM32CubeIDE**
+   - File → Open Projects from File System
+   - Select the project folder
+   - Click Finish
 
-3. **Bağımlılıkları Kontrol Edin**
-   - HAL kütüphaneleri otomatik yüklenir
-   - FATFS middleware aktif olmalı
+3. **Check Dependencies**
+   - HAL libraries are included automatically
+   - Ensure FATFS middleware is enabled
 
 ---
 
-## ⚙️ Derleme ve Yükleme
+## ⚙️ Build and Flash
 
-### Derleme
+### Build
 
-1. STM32CubeIDE'de projeyi açın
-2. `Project` → `Build All` (Ctrl+B)
-3. Hata olmadan derlenmeli (0 errors, 0 warnings hedeflenmeli)
+1. Open the project in STM32CubeIDE
+2. Project → Build All (Ctrl+B)
+3. It should compile without errors (aim for 0 errors and 0 warnings)
 
-### Yükleme
+### Flash
 
-#### ST-Link ile
-1. ST-Link'i bilgisayara ve kartınıza bağlayın
-2. `Run` → `Debug` (F11) veya `Run` (Ctrl+F11)
-3. Firmware otomatik olarak yüklenecektir
+#### Using ST-Link
+1. Connect the ST-Link to your PC and board
+2. Run → Debug (F11) or Run (Ctrl+F11)
+3. Firmware will be flashed automatically
 
-#### OpenOCD ile (alternatif)
+#### Using OpenOCD (alternative)
 ```bash
 openocd -f interface/stlink.cfg -f target/stm32f4x.cfg -c "program SkyLord.elf verify reset exit"
 ```
 
 ---
 
-## 📡 Sistem Modları
+## 📡 System Modes
 
-SkyLord üç farklı çalışma modunu destekler:
+SkyLord supports three operation modes:
 
-### 1️⃣ MODE_NORMAL (Operasyonel Mod)
-- **Amaç**: Gerçek uçuş sırasında kullanılır
-- **Özellikler**:
-  - Tüm sensörler aktif
-  - Sensör füzyonu ve uçuş algoritması çalışır
-  - SD karta veri kaydı yapılır
-  - LoRa ile telemetri gönderilir
-  - GPS konumu güncellenir
-- **Başlatma**: UART komutu ile (`MODE:NORMAL`)
+### 1️⃣ MODE_NORMAL (Operational Mode)
+- **Purpose**: Used during an actual flight
+- **Features**:
+  - All sensors active
+  - Sensor fusion and flight algorithm running
+  - Data logged to SD card
+  - Telemetry sent via LoRa
+  - GPS position updated
+- **Start**: Via UART command (`MODE:NORMAL`)
 
 ### 2️⃣ MODE_SIT (System Integration Test)
-- **Amaç**: Donanım ve sensör testleri
-- **Özellikler**:
-  - Gerçek sensör verileri okunur
-  - Veri akışı kontrol edilir
-  - Kalibrasyon testleri yapılır
-  - Haberleşme modülleri test edilir
-- **Başlatma**: UART komutu ile (`MODE:SIT`)
+- **Purpose**: Hardware and sensor testing
+- **Features**:
+  - Real sensor data is read
+  - Data flow is verified
+  - Calibration tests run
+  - Communication modules tested
+- **Start**: Via UART command (`MODE:SIT`)
 
 ### 3️⃣ MODE_SUT (System Unit Test)
-- **Amaç**: Algoritmaların sentetik verilerle doğrulanması
-- **Özellikler**:
-  - Simüle edilmiş uçuş verileri kullanılır
-  - Uçuş algoritması doğrulaması
-  - Kalman filtre performans testi
-- **Başlatma**: UART komutu ile (`MODE:SUT`)
+- **Purpose**: Validate algorithms using synthetic data
+- **Features**:
+  - Uses simulated flight data
+  - Flight algorithm validation
+  - Kalman filter performance testing
+- **Start**: Via UART command (`MODE:SUT`)
 
 ---
 
-## 📊 Telemetri Paketi
+## 📊 Telemetry Packet
 
-### Normal Paket Formatı (62 byte)
+### Normal Packet Format (62 bytes)
 
-| Byte | Alan | Veri Tipi | Birim | Açıklama |
-|------|------|-----------|-------|----------|
-| 0-3 | Zaman Damgası | uint32_t | ms | Sistem çalışma süresi |
-| 4-7 | Enlem | float | derece | GPS enlem (-90 to 90) |
-| 8-11 | Boylam | float | derece | GPS boylam (-180 to 180) |
-| 12-15 | GPS Yükseklik | float | m | GPS yüksekliği |
-| 16-19 | Barometrik Yükseklik | float | m | BME280 yükseklik |
-| 20-23 | Hız (Dikey) | float | m/s | Kalman tahmin |
-| 24-27 | İvme X | float | m/s² | BMI088 |
-| 28-31 | İvme Y | float | m/s² | BMI088 |
-| 32-35 | İvme Z | float | m/s² | BMI088 |
-| 36-39 | Jiroskop X | float | °/s | BMI088 |
-| 40-43 | Jiroskop Y | float | °/s | BMI088 |
-| 44-47 | Jiroskop Z | float | °/s | BMI088 |
-| 48-51 | Angle | float | ° | Oryantasyon |
-| 52-55 | Voltaj | float | V | ADC1 |
-| 56-59 | Sıcaklık | float | °C | BME280 |
-| 60 | Uçuş Fazı | uint8_t | - | 0-5 arası |
-| 61 | CRC | uint8_t | - | Paket doğrulama |
+| Byte | Field | Data Type | Unit | Description |
+|------|-------|-----------|------|-------------|
+| 0-3  | Timestamp | uint32_t | ms | System uptime |
+| 4-7  | Latitude | float | degrees | GPS latitude (-90 to 90) |
+| 8-11 | Longitude | float | degrees | GPS longitude (-180 to 180) |
+| 12-15 | GPS Altitude | float | m | GPS altitude |
+| 16-19 | Barometric Altitude | float | m | BME280 altitude |
+| 20-23 | Vertical Speed | float | m/s | Kalman estimate |
+| 24-27 | Accel X | float | m/s² | BMI088 |
+| 28-31 | Accel Y | float | m/s² | BMI088 |
+| 32-35 | Accel Z | float | m/s² | BMI088 |
+| 36-39 | Gyro X | float | °/s | BMI088 |
+| 40-43 | Gyro Y | float | °/s | BMI088 |
+| 44-47 | Gyro Z | float | °/s | BMI088 |
+| 48-51 | Angle | float | ° | Orientation |
+| 52-55 | Voltage | float | V | ADC1 |
+| 56-59 | Temperature | float | °C | BME280 |
+| 60   | Flight Phase | uint8_t | - | 0-5 |
+| 61   | CRC | uint8_t | - | Packet validation |
 
-### SD Kart Paket Formatı (64 byte)
-Normal pakete ek olarak:
-- **62-63**: Ek durum bilgisi (sistem sağlığı, hata kodları)
+### SD Card Packet Format (64 bytes)
+In addition to the normal packet:
+- **62-63**: Additional status info (system health, error codes)
 
 ---
 
-## 🧪 Test ve Doğrulama
+## 🧪 Testing and Validation
 
-### Başlangıç Kontrol Listesi
+### Preflight Checklist
 
 ```
-☐ BME280 sensör ID kontrolü (0x60)
-☐ BMI088 ivmeölçer ID kontrolü (0x1E)
-☐ BMI088 jiroskop ID kontrolü (0x0F)
-☐ SD kart bağlantısı testi
-☐ GPS fix alma (açık havada, 1-2 dk)
-☐ LoRa menzil testi (100m+)
-☐ Pil voltajı ölçüm doğrulaması
-☐ Kurtarma sistemi güvenlik testleri
+☐ BME280 sensor ID check (0x60)
+☐ BMI088 accelerometer ID check (0x1E)
+☐ BMI088 gyroscope ID check (0x0F)
+☐ SD card connection test
+☐ GPS fix obtained (outdoors, 1-2 min)
+☐ LoRa range test (100m+)
+☐ Battery voltage measurement verification
+☐ Recovery system safety tests
 ```
 
-### Kalibrasyon Prosedürü
+### Calibration Procedure
 
-1. **Yatay Zemin Kalibrasyonu**
-   - Kartı düz bir yüzeye yerleştirin
-   - Power-on reset yapın (güç verip 5 saniye bekleyin)
-   - Buzzer bir kez çaldığında kalibrasyon tamamlanmıştır
+1. **Horizontal Surface Calibration**
+   - Place the board on a flat surface
+   - Power on and wait 5 seconds
+   - When the buzzer beeps once, calibration is complete
 
-2. **Baz Yükseklik Ayarı**
-   - Fırlatma noktasında kartı açın
-   - İlk 10 saniye boyunca hareketsiz tutun
-   - Baz yükseklik otomatik kaydedilir
+2. **Base Altitude Setup**
+   - Power on the board at the launch site
+   - Keep the board stationary for the first 10 seconds
+   - Base altitude is recorded automatically
 
 3. **GPS Fix**
-   - Açık havada bekleyin
-   - Telemetri çıkışında GPS verilerini kontrol edin
+   - Wait outdoors
+   - Verify GPS data on the telemetry output
 
 ---
 
-## 🔧 Sorun Giderme
+## 🔧 Troubleshooting
 
-### Sensör Okumaları Sıfır Geliyor
-**Olası Nedenler:**
-- I2C bağlantı problemi
-- Yanlış pull-up direnç değerleri
-- Güç kaynağı yetersizliği
+### Sensor Readings Are Zero
+Possible causes:
+- I2C connection issue
+- Incorrect pull-up resistor values
+- Insufficient power supply
 
-**Çözümler:**
-1. I2C tarama yapın (debug UART üzerinden)
-2. SCL/SDA pinlerinde osilatör ile sinyal kontrol edin
-3. 3.3V besleme voltajını ölçün
+Solutions:
+1. Run an I2C scan (via debug UART)
+2. Check SCL/SDA signals with an oscilloscope
+3. Measure the 3.3V supply voltage
 
-### LoRa Telemetri Gönderilmiyor
-**Olası Nedenler:**
-- Düşük pil voltajı (7V altı)
-- LoRa modül konfigürasyonu yanlış
-- Anten bağlantısı kopuk
+### LoRa Telemetry Not Sending
+Possible causes:
+- Low battery voltage (below 7V)
+- Incorrect LoRa module configuration
+- Antenna disconnected
 
-**Çözümler:**
-1. Pil voltajını kontrol edin (minimum 7.4V)
-2. LoRa modülünü yeniden başlatın (M0/M1 pinleri)
-3. Anten VSWR değerini ölçün
+Solutions:
+1. Check battery voltage (minimum 7.4V recommended)
+2. Restart the LoRa module (M0/M1 pins)
+3. Measure antenna VSWR
 
-### SD Kart Veri Kaydı Yapmıyor
-**Olası Nedenler:**
-- FAT32 formatı değil
-- Bozuk SD kart
-- SPI iletişim hatası
+### SD Card Not Logging
+Possible causes:
+- Not FAT32 formatted
+- Corrupted SD card
+- SPI communication issue
 
-**Çözümler:**
-1. SD kartı FAT32 olarak formatla (Max 32GB)
-2. Farklı bir SD kart deneyin
-3. SPI pinlerini osilatörle kontrol edin
+Solutions:
+1. Format the SD card as FAT32 (max 32GB)
+2. Try a different SD card
+3. Inspect SPI signals with an oscilloscope
 
 ---
 
+## 📞 Contact
 
-## 📞 İletişim
-
-**Proje Sahibi**: Halil Sarıkaya
+**Project Owner**: Halil Sarıkaya
 
 - GitHub: [@halilsrky](https://github.com/halilsrky)
-- E-posta: halilsarikaya070@gmail.com
+- Email: halilsarikaya070@gmail.com
 - LinkedIn: www.linkedin.com/in/halil-sarıkaya-3a777321b
 
 ---
 
+## 📈 Project Status
 
-## 📈 Proje Durumu
-
-**Versiyon**: 1.0.0  
-**Durum**: 🟢 Aktif Geliştirme  
-**Son Güncelleme**: 03 Ekim 2025
-
+**Version**: 1.0.0  
+**Status**: 🟢 Active Development  
+**Last Updated**: 03 October 2025
 
 ---
 
 <p align="center">
-  <strong>🚀 İyi Uçuşlar! 🚀</strong>
+  <strong>🚀 Fly Safe! 🚀</strong>
 </p>
